@@ -2,7 +2,7 @@
 #
 #  Copyright (c) 2011-2012, ARM Limited. All rights reserved.
 #  Copyright (c) 2021-2022, Rockchip Limited. All rights reserved.
-#  Copyright (c) 2023, Mario Bălănică <mariobalanica02@gmail.com>
+#  Copyright (c) 2023-2025, Mario Bălănică <mariobalanica02@gmail.com>
 #
 #  SPDX-License-Identifier: BSD-2-Clause-Patent
 #
@@ -52,11 +52,27 @@
 
   DEFINE DEBUG_PRINT_ERROR_LEVEL_NO_INFO = $(DEBUG_PRINT_ERROR_LEVEL) & ~0x00000040
 
+  #
+  # DEBUG_ASSERT_ENABLED       0x01
+  # DEBUG_PRINT_ENABLED        0x02
+  # DEBUG_CODE_ENABLED         0x04
+  # CLEAR_MEMORY_ENABLED       0x08
+  # ASSERT_BREAKPOINT_ENABLED  0x10
+  # ASSERT_DEADLOOP_ENABLED    0x20
+  #
+!if $(TARGET) == RELEASE
+  DEFINE DEBUG_PROPERTY_MASK             = 0x00
+!else
+  DEFINE DEBUG_PROPERTY_MASK             = 0x0f
+!endif
+
 ################################################################################
 #
 # Library Class section - list of all common Library Classes needed by Rockchip platforms.
 #
 ################################################################################
+
+!include MdePkg/MdeLibs.dsc.inc
 
 [LibraryClasses.common]
 !if $(TARGET) == RELEASE
@@ -111,10 +127,30 @@
   # SCMI Mailbox Transport Layer
   ArmMtlLib|Silicon/Rockchip/Library/RkMtlLib/RkMtlLib.inf
 
+  # SMC/HVC dependencies
+  ArmSmcLib|ArmPkg/Library/ArmSmcLib/ArmSmcLib.inf
+  ArmHvcLib|ArmPkg/Library/ArmHvcLib/ArmHvcLib.inf
+  ArmMonitorLib|ArmPkg/Library/ArmMonitorLib/ArmMonitorLib.inf
+
+  #
+  # Secure Boot dependencies
+  #
+!if $(SECURE_BOOT_ENABLE) == TRUE
+  TpmMeasurementLib|SecurityPkg/Library/DxeTpmMeasurementLib/DxeTpmMeasurementLib.inf
+  AuthVariableLib|SecurityPkg/Library/AuthVariableLib/AuthVariableLib.inf
+  SecureBootVariableLib|SecurityPkg/Library/SecureBootVariableLib/SecureBootVariableLib.inf
+  SecureBootVariableProvisionLib|SecurityPkg/Library/SecureBootVariableProvisionLib/SecureBootVariableProvisionLib.inf
+  PlatformPKProtectionLib|SecurityPkg/Library/PlatformPKProtectionLibVarPolicy/PlatformPKProtectionLibVarPolicy.inf
+
+  # re-use the UserPhysicalPresent() dummy implementation from the ovmf tree
+  PlatformSecureLib|OvmfPkg/Library/PlatformSecureLib/PlatformSecureLib.inf
+!else
+  TpmMeasurementLib|MdeModulePkg/Library/TpmMeasurementLibNull/TpmMeasurementLibNull.inf
+  AuthVariableLib|MdeModulePkg/Library/AuthVariableLibNull/AuthVariableLibNull.inf
+!endif
+
   # VariableRuntimeDxe Requirements
   SynchronizationLib|MdePkg/Library/BaseSynchronizationLib/BaseSynchronizationLib.inf
-  AuthVariableLib|MdeModulePkg/Library/AuthVariableLibNull/AuthVariableLibNull.inf
-  TpmMeasurementLib|MdeModulePkg/Library/TpmMeasurementLibNull/TpmMeasurementLibNull.inf
   VarCheckLib|MdeModulePkg/Library/VarCheckLib/VarCheckLib.inf
   VariableFlashInfoLib|MdeModulePkg/Library/BaseVariableFlashInfoLib/BaseVariableFlashInfoLib.inf
 
@@ -132,10 +168,6 @@
   CacheMaintenanceLib|ArmPkg/Library/ArmCacheMaintenanceLib/ArmCacheMaintenanceLib.inf
   DefaultExceptionHandlerLib|ArmPkg/Library/DefaultExceptionHandlerLib/DefaultExceptionHandlerLib.inf
   CpuExceptionHandlerLib|ArmPkg/Library/ArmExceptionLib/ArmExceptionLib.inf
-  ArmDisassemblerLib|ArmPkg/Library/ArmDisassemblerLib/ArmDisassemblerLib.inf
-  ArmGicLib|ArmPkg/Drivers/ArmGic/ArmGicLib.inf
-  ArmGicArchLib|ArmPkg/Library/ArmGicArchLib/ArmGicArchLib.inf
-  ArmPlatformStackLib|ArmPlatformPkg/Library/ArmPlatformStackLib/ArmPlatformStackLib.inf
   ArmSmcLib|ArmPkg/Library/ArmSmcLib/ArmSmcLib.inf
   ArmMmuLib|ArmPkg/Library/ArmMmuLib/ArmMmuBaseLib.inf
   ArmLib|ArmPkg/Library/ArmLib/ArmBaseLib.inf
@@ -146,7 +178,7 @@
   # UartLib|Silicon/Rockchip/Library/SerialPortLib/UartLib.inf
 
   # Runtime reset helper
-  ResetSystemLib|Silicon/Rockchip/Library/ResetSystemLib/ResetSystemLib.inf
+  ResetSystemLib|ArmPkg/Library/ArmPsciResetSystemLib/ArmPsciResetSystemLib.inf
 
   #
   # Uncomment (and comment out the next line) For RealView Debugger. The Standard IO window
@@ -163,9 +195,6 @@
 
   SemihostLib|ArmPkg/Library/SemihostLib/SemihostLib.inf
 
-  TpmMeasurementLib|MdeModulePkg/Library/TpmMeasurementLibNull/TpmMeasurementLibNull.inf
-  AuthVariableLib|MdeModulePkg/Library/AuthVariableLibNull/AuthVariableLibNull.inf
-
   # Flattened Device Tree (FDT) access library
   FdtLib|EmbeddedPkg/Library/FdtLib/FdtLib.inf
 
@@ -173,7 +202,6 @@
   VariablePolicyHelperLib|MdeModulePkg/Library/VariablePolicyHelperLib/VariablePolicyHelperLib.inf
 
   ExtractGuidedSectionLib|MdePkg/Library/DxeExtractGuidedSectionLib/DxeExtractGuidedSectionLib.inf
-  LzmaDecompressLib|MdeModulePkg/Library/LzmaCustomDecompressLib/LzmaCustomDecompressLib.inf
 
   NonDiscoverableDeviceRegistrationLib|MdeModulePkg/Library/NonDiscoverableDeviceRegistrationLib/NonDiscoverableDeviceRegistrationLib.inf
 
@@ -184,7 +212,8 @@
 
   CapsuleLib|MdeModulePkg/Library/DxeCapsuleLibNull/DxeCapsuleLibNull.inf
   OpensslLib|CryptoPkg/Library/OpensslLib/OpensslLib.inf
-  RngLib|MdePkg/Library/BaseRngLibTimerLib/BaseRngLibTimerLib.inf
+  RngLib|MdeModulePkg/Library/BaseRngLibTimerLib/BaseRngLibTimerLib.inf
+  ArmTrngLib|ArmPkg/Library/ArmTrngLib/ArmTrngLib.inf
   IntrinsicLib|CryptoPkg/Library/IntrinsicLib/IntrinsicLib.inf
   BaseCryptLib|CryptoPkg/Library/BaseCryptLib/BaseCryptLib.inf
   FmpAuthenticationLib|SecurityPkg/Library/FmpAuthenticationLibPkcs7/FmpAuthenticationLibPkcs7.inf
@@ -193,15 +222,9 @@
   TlsLib|CryptoPkg/Library/TlsLib/TlsLib.inf
   #PlatformFlashAccessLib|Silicon/Rockchip/Library/PlatformFlashAccessLib/PlatformFlashAccessLibDxe.inf
 
-  #
-  # It is not possible to prevent the ARM compiler for generic intrinsic functions.
-  # This library provides the instrinsic functions generate by a given compiler.
-  # And NULL mean link this library into all ARM images.
-  #
-  NULL|ArmPkg/Library/CompilerIntrinsicsLib/CompilerIntrinsicsLib.inf
+  ImagePropertiesRecordLib|MdeModulePkg/Library/ImagePropertiesRecordLib/ImagePropertiesRecordLib.inf
 
-  # Add support for GCC stack protector
-  NULL|MdePkg/Library/BaseStackCheckLib/BaseStackCheckLib.inf
+  ResetUtilityLib|MdeModulePkg/Library/ResetUtilityLib/ResetUtilityLib.inf
 
   # RkSdmmcDxe dependencies
   RkSdmmcPlatformLib|Silicon/Rockchip/Library/RkSdmmcPlatformLibNull/RkSdmmcPlatformLibNull.inf
@@ -220,8 +243,9 @@
   PWMLib|Silicon/Rockchip/Library/PWMLib/PWMLib.inf
   RockchipDisplayLib|Silicon/Rockchip/Library/DisplayLib/RockchipDisplayLib.inf
 
+  BaseVariableLib|Silicon/Rockchip/Library/BaseVariableLib/BaseVariableLib.inf
+
 [LibraryClasses.common.SEC]
-  ArmGicArchLib|ArmPkg/Library/ArmGicArchSecLib/ArmGicArchSecLib.inf
   PcdLib|MdePkg/Library/BasePcdLibNull/BasePcdLibNull.inf
   BaseMemoryLib|MdePkg/Library/BaseMemoryLib/BaseMemoryLib.inf
   PrePiLib|EmbeddedPkg/Library/PrePiLib/PrePiLib.inf
@@ -314,6 +338,10 @@
   VariablePolicyLib|MdeModulePkg/Library/VariablePolicyLib/VariablePolicyLibRuntimeDxe.inf
 FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
 
+!if $(SECURE_BOOT_ENABLE) == TRUE
+  BaseCryptLib|CryptoPkg/Library/BaseCryptLib/RuntimeCryptLib.inf
+!endif
+
 [LibraryClasses.AARCH64]
   ArmGenericTimerCounterLib|ArmPkg/Library/ArmGenericTimerPhyCounterLib/ArmGenericTimerPhyCounterLib.inf
 
@@ -324,9 +352,10 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
 ###################################################################################################
 
 [BuildOptions]
-#  RVCT:RELEASE_*_*_CC_FLAGS  = -DMDEPKG_NDEBUG
-  *_*_*_CC_FLAGS = -DDEFAULT_DARK
-  *_GCC5_AARCH64_CC_FLAGS  = -Wno-error=uninitialized -Wno-error=stringop-overflow -Wno-error=unused-function -Wno-error=unused-variable
+  GCC:*_*_AARCH64_CC_FLAGS  = -Wno-error=unused-function
+
+  # Compile with symbols to support overlays.
+  *_*_*_DTC_FLAGS = -@
 
 [BuildOptions.common.EDKII.DXE_RUNTIME_DRIVER]
   GCC:*_*_ARM_DLINK_FLAGS = -z common-page-size=0x1000
@@ -339,21 +368,14 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
 ################################################################################
 
 [PcdsFeatureFlag.common]
-  gEfiMdePkgTokenSpaceGuid.PcdComponentNameDisable|TRUE
   gEfiMdePkgTokenSpaceGuid.PcdDriverDiagnosticsDisable|TRUE
-  gEfiMdePkgTokenSpaceGuid.PcdComponentName2Disable|TRUE
   gEfiMdePkgTokenSpaceGuid.PcdDriverDiagnostics2Disable|TRUE
-
-  # Use the Vector Table location in CpuDxe. We will not copy the Vector Table at PcdCpuVectorBaseAddress
-  gArmTokenSpaceGuid.PcdRelocateVectorTable|FALSE
 
   gEmbeddedTokenSpaceGuid.PcdPrePiProduceMemoryTypeInformationHob|TRUE
 
   gEfiMdeModulePkgTokenSpaceGuid.PcdTurnOffUsbLegacySupport|TRUE
 
   gEfiMdeModulePkgTokenSpaceGuid.PcdInstallAcpiSdtProtocol|TRUE
-
-  gArmTokenSpaceGuid.PcdArmGicV3WithV2Legacy|FALSE
 
   #  If TRUE, Graphics Output Protocol will be installed on virtual handle created by ConsplitterDxe.
   #  It could be set FALSE to save size.
@@ -377,17 +399,7 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
   gEfiMdePkgTokenSpaceGuid.PcdUefiLibMaxPrintBufferSize|320
   gEfiMdePkgTokenSpaceGuid.PcdDefaultTerminalType|4
 
-  # DEBUG_ASSERT_ENABLED       0x01
-  # DEBUG_PRINT_ENABLED        0x02
-  # DEBUG_CODE_ENABLED         0x04
-  # CLEAR_MEMORY_ENABLED       0x08
-  # ASSERT_BREAKPOINT_ENABLED  0x10
-  # ASSERT_DEADLOOP_ENABLED    0x20
-!if $(TARGET) == RELEASE
-  gEfiMdePkgTokenSpaceGuid.PcdDebugPropertyMask|0x00
-!else
-  gEfiMdePkgTokenSpaceGuid.PcdDebugPropertyMask|0x0f
-!endif
+  gEfiMdePkgTokenSpaceGuid.PcdDebugPropertyMask|$(DEBUG_PROPERTY_MASK)
 
   gEfiMdePkgTokenSpaceGuid.PcdDebugPrintErrorLevel|$(DEBUG_PRINT_ERROR_LEVEL)
 
@@ -406,9 +418,15 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiACPIReclaimMemory|0
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiACPIMemoryNVS|0
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiReservedMemoryType|0
+!if $(SECURE_BOOT_ENABLE) == TRUE
+  gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiRuntimeServicesData|600
+  gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiRuntimeServicesCode|400
+  gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiBootServicesCode|1500
+!else
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiRuntimeServicesData|50
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiRuntimeServicesCode|20
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiBootServicesCode|400
+!endif
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiBootServicesData|20000
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiLoaderCode|20
   gEmbeddedTokenSpaceGuid.PcdMemoryTypeEfiLoaderData|0
@@ -429,8 +447,22 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
   #gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingSize|0x00010000
   #gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareSize|0x00010000
 
+!if $(SECURE_BOOT_ENABLE) == TRUE
+  # override the default values from SecurityPkg to ensure images from all sources are verified in secure boot
+  gEfiSecurityPkgTokenSpaceGuid.PcdOptionRomImageVerificationPolicy|0x04
+  gEfiSecurityPkgTokenSpaceGuid.PcdFixedMediaImageVerificationPolicy|0x04
+  gEfiSecurityPkgTokenSpaceGuid.PcdRemovableMediaImageVerificationPolicy|0x04
+!endif
+
+  gEfiMdeModulePkgTokenSpaceGuid.PcdMaxVariableSize|0x2000
+  gEfiMdeModulePkgTokenSpaceGuid.PcdMaxAuthVariableSize|0x2800
+
+  # Default platform supported RFC 4646 languages: (American) English
+  gEfiMdePkgTokenSpaceGuid.PcdUefiVariableDefaultPlatformLangCodes|"en-US"
+
 [PcdsDynamicHii.common.DEFAULT]
-  gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut|L"Timeout"|gEfiGlobalVariableGuid|0x0|10 # Variable: L"Timeout"
+  gEfiMdePkgTokenSpaceGuid.PcdPlatformBootTimeOut|L"Timeout"|gEfiGlobalVariableGuid|0x0|5 # Variable: L"Timeout"
+  gEfiMdeModulePkgTokenSpaceGuid.PcdBootDiscoveryPolicy|L"BootDiscoveryPolicy"|gBootDiscoveryPolicyMgrFormsetGuid|0x0|2 # Connect All
 
 ################################################################################
 #
@@ -443,7 +475,10 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
   #
   # PEI Phase modules
   #
-  ArmPlatformPkg/PrePi/PeiUniCore.inf
+  ArmPlatformPkg/PeilessSec/PeilessSec.inf {
+    <LibraryClasses>
+      NULL|MdeModulePkg/Library/LzmaCustomDecompressLib/LzmaCustomDecompressLib.inf
+  }
 
   #
   # DXE
@@ -464,14 +499,24 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
   #
   ArmPkg/Drivers/CpuDxe/CpuDxe.inf
   MdeModulePkg/Core/RuntimeDxe/RuntimeDxe.inf
+!if $(SECURE_BOOT_ENABLE) == TRUE
+  MdeModulePkg/Universal/SecurityStubDxe/SecurityStubDxe.inf {
+    <LibraryClasses>
+      NULL|SecurityPkg/Library/DxeImageVerificationLib/DxeImageVerificationLib.inf
+  }
+  SecurityPkg/VariableAuthenticated/SecureBootConfigDxe/SecureBootConfigDxe.inf
+  SecurityPkg/EnrollFromDefaultKeysApp/EnrollFromDefaultKeysApp.inf
+  SecurityPkg/VariableAuthenticated/SecureBootDefaultKeysDxe/SecureBootDefaultKeysDxe.inf
+!else
   MdeModulePkg/Universal/SecurityStubDxe/SecurityStubDxe.inf
+!endif
   MdeModulePkg/Universal/CapsuleRuntimeDxe/CapsuleRuntimeDxe.inf
   EmbeddedPkg/EmbeddedMonotonicCounter/EmbeddedMonotonicCounter.inf
   MdeModulePkg/Universal/ResetSystemRuntimeDxe/ResetSystemRuntimeDxe.inf
   EmbeddedPkg/RealTimeClockRuntimeDxe/RealTimeClockRuntimeDxe.inf {
   <LibraryClasses>
 !if $(RK_RTC8563_ENABLE) == TRUE
-    RealTimeClockLib|Silicon/NXP/Library/Pcf8563RealTimeClockLib/Pcf8563RealTimeClockLib.inf
+    RealTimeClockLib|Silicon/Rockchip/Library/Pcf8563RealTimeClockLib/Pcf8563RealTimeClockLib.inf
 !else
     RealTimeClockLib|EmbeddedPkg/Library/VirtualRealTimeClockLib/VirtualRealTimeClockLib.inf
 !endif
@@ -481,6 +526,25 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
     <LibraryClasses>
       PcdLib|MdePkg/Library/DxePcdLib/DxePcdLib.inf
   }
+  SecurityPkg/RandomNumberGenerator/RngDxe/RngDxe.inf
+  SecurityPkg/Hash2DxeCrypto/Hash2DxeCrypto.inf
+
+  #
+  # ExitBootServices hook manager
+  #
+  Silicon/Rockchip/Drivers/ExitBootServicesHookDxe/ExitBootServicesHookDxe.inf
+
+  #
+  # Runtime Services state manager
+  #
+  Silicon/Rockchip/Drivers/RuntimeServicesManagerDxe/RuntimeServicesManagerDxe.inf
+
+  #
+  # Status LED support
+  #
+!if $(RK_STATUS_LED_ENABLE) == TRUE
+  Silicon/Rockchip/Drivers/StatusLedDxe/StatusLedDxe.inf
+!endif
 
   #
   # Non-volatile FVB support
@@ -489,7 +553,11 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
   Silicon/Rockchip/Drivers/NorFlashDxe/NorFlashDxe.inf
 !endif
   Silicon/Rockchip/Drivers/RkFvbDxe/RkFvbDxe.inf
-  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf
+  MdeModulePkg/Universal/Variable/RuntimeDxe/VariableRuntimeDxe.inf {
+    <LibraryClasses>
+      # Depex on gEdkiiNvVarStoreFormattedGuid installed by RkFvbDxe
+      NULL|EmbeddedPkg/Library/NvVarStoreFormattedLib/NvVarStoreFormattedLib.inf
+  }
   MdeModulePkg/Universal/FaultTolerantWriteDxe/FaultTolerantWriteDxe.inf
 
   #
@@ -504,7 +572,7 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
   #
   # Arm GIC
   #
-  ArmPkg/Drivers/ArmGic/ArmGicDxe.inf
+  ArmPkg/Drivers/ArmGicDxe/ArmGicV3Dxe.inf
 
   #
   # Timer
@@ -520,16 +588,11 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
   #
   # ACPI Support
   #
-  MdeModulePkg/Universal/Acpi/AcpiTableDxe/AcpiTableDxe.inf
-  MdeModulePkg/Universal/Acpi/BootGraphicsResourceTableDxe/BootGraphicsResourceTableDxe.inf
-
-  #
-  # DeviceTree Support
-  #
-  EmbeddedPkg/Drivers/DtPlatformDxe/DtPlatformDxe.inf {
-  <LibraryClasses>
-    DtPlatformDtbLoaderLib|EmbeddedPkg/Library/DxeDtPlatformDtbLoaderLibDefault/DxeDtPlatformDtbLoaderLibDefault.inf
+  MdeModulePkg/Universal/Acpi/AcpiTableDxe/AcpiTableDxe.inf {
+    <PcdsFixedAtBuild>
+      gEfiMdePkgTokenSpaceGuid.PcdDebugPropertyMask|$(DEBUG_PROPERTY_MASK) & ~0x04
   }
+  MdeModulePkg/Universal/Acpi/BootGraphicsResourceTableDxe/BootGraphicsResourceTableDxe.inf
 
   #
   # SMBIOS Support
@@ -548,15 +611,22 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
 !if $(RK_RTC8563_ENABLE) == TRUE
   Silicon/Rockchip/Drivers/Rtc8563PlatformDxe/Rtc8563PlatformDxe.inf
 !endif
-  # Silicon/Rockchip/Drivers/I2c/I2cDemoDxe/I2cDemoDxe.inf
+!if $(RK_PCA9555_ENABLE) == TRUE
+  Silicon/Rockchip/Drivers/Pca9555Dxe/Pca9555Dxe.inf
+!endif
 
   #
   # Display Support
   #
   Silicon/Rockchip/Drivers/Vop2Dxe/Vop2Dxe.inf
-  # Silicon/Rockchip/Library/DisplayLib/AnalogixDpLib.inf
+!if $(RK_ANALOGIX_DP_ENABLE) == TRUE
+  Silicon/Rockchip/Library/DisplayLib/AnalogixDpLib.inf
+!endif
+!if $(RK_DW_HDMI_QP_ENABLE) == TRUE
   Silicon/Rockchip/Library/DisplayLib/DwHdmiQpLib.inf
+!endif
   Silicon/Rockchip/Library/DisplayLib/DwDpLib.inf
+  Silicon/Rockchip/Library/DisplayLib/DwMipiDsi2Lib.inf
   Silicon/Rockchip/Drivers/LcdGraphicsOutputDxe/LcdGraphicsOutputDxe.inf
 
   #
@@ -629,7 +699,13 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
 !endif
   }
   FatPkg/EnhancedFatDxe/Fat.inf
+!include Features/Ext4Pkg/Ext4.dsc.inc
   MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
+
+  #
+  # RAM Disk Support
+  #
+  MdeModulePkg/Universal/Disk/RamDiskDxe/RamDiskDxe.inf
 
   #
   # UEFI Network Stack
@@ -637,9 +713,15 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
 !include NetworkPkg/Network.dsc.inc
 
 !if $(NETWORK_ENABLE) == TRUE
+  #
+  # Network Stack Configuration Driver
+  #
+  Silicon/Rockchip/Drivers/NetworkStackConfigDxe/NetworkStackConfigDxe.inf
 
 !if $(NETWORK_SNP_ENABLE) == TRUE
   NetworkPkg/SnpDxe/SnpDxe.inf {
+    <LibraryClasses>
+      NULL|Silicon/Rockchip/Drivers/NetworkStackConfigDxe/NetworkStackEnabledLib.inf
     <PcdsFixedAtBuild>
 !if $(DEBUG_PRINT_INFO_MODULE_EXCLUDE) & $(DEBUG_MODULE_SNPDXE)
       gEfiMdePkgTokenSpaceGuid.PcdDebugPrintErrorLevel|$(DEBUG_PRINT_ERROR_LEVEL_NO_INFO)
@@ -648,11 +730,41 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
 !endif
 
   NetworkPkg/MnpDxe/MnpDxe.inf {
+    <LibraryClasses>
+      NULL|Silicon/Rockchip/Drivers/NetworkStackConfigDxe/NetworkStackEnabledLib.inf
     <PcdsFixedAtBuild>
 !if $(DEBUG_PRINT_INFO_MODULE_EXCLUDE) & $(DEBUG_MODULE_MNPDXE)
       gEfiMdePkgTokenSpaceGuid.PcdDebugPrintErrorLevel|$(DEBUG_PRINT_ERROR_LEVEL_NO_INFO)
 !endif
   }
+
+!if $(NETWORK_IP4_ENABLE) == TRUE
+  NetworkPkg/Ip4Dxe/Ip4Dxe.inf {
+    <LibraryClasses>
+      NULL|Silicon/Rockchip/Drivers/NetworkStackConfigDxe/NetworkStackIpv4EnabledLib.inf
+  }
+!endif
+
+!if $(NETWORK_IP6_ENABLE) == TRUE
+  NetworkPkg/Ip6Dxe/Ip6Dxe.inf {
+    <LibraryClasses>
+      NULL|Silicon/Rockchip/Drivers/NetworkStackConfigDxe/NetworkStackIpv6EnabledLib.inf
+  }
+!endif
+
+!if $(NETWORK_PXE_BOOT_ENABLE) == TRUE
+  NetworkPkg/UefiPxeBcDxe/UefiPxeBcDxe.inf {
+    <LibraryClasses>
+      NULL|Silicon/Rockchip/Drivers/NetworkStackConfigDxe/NetworkStackPxeBootEnabledLib.inf
+  }
+!endif
+
+!if $(NETWORK_HTTP_BOOT_ENABLE) == TRUE
+  NetworkPkg/HttpBootDxe/HttpBootDxe.inf {
+    <LibraryClasses>
+      NULL|Silicon/Rockchip/Drivers/NetworkStackConfigDxe/NetworkStackHttpBootEnabledLib.inf
+  }
+!endif
 
   #
   # Realtek PCIe UNDI Driver
@@ -663,22 +775,24 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
   # Realtek USB UNDI Driver
   #
   Drivers/Realtek/Bus/Usb/UsbNetworking/RtkUsbUndiDxe.inf
+!endif
 
   #
-  # AX88772 Ethernet Driver for Apple Ethernet Adapter
+  # EFI Memory Attribute Protocol state manager (rhboot shim workaround)
   #
-  Drivers/ASIX/Bus/Usb/UsbNetworking/Ax88772c/Ax88772c.inf
-!endif
+  EmbeddedPkg/Drivers/MemoryAttributeManagerDxe/MemoryAttributeManagerDxe.inf
 
   #
   # Bds
   #
+  MdeModulePkg/Universal/BootManagerPolicyDxe/BootManagerPolicyDxe.inf
   MdeModulePkg/Universal/DevicePathDxe/DevicePathDxe.inf
   MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
   MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf
   MdeModulePkg/Universal/BdsDxe/BdsDxe.inf
   MdeModulePkg/Application/UiApp/UiApp.inf {
     <LibraryClasses>
+      NULL|MdeModulePkg/Library/BootDiscoveryPolicyUiLib/BootDiscoveryPolicyUiLib.inf
       NULL|MdeModulePkg/Library/DeviceManagerUiLib/DeviceManagerUiLib.inf
       NULL|MdeModulePkg/Library/BootManagerUiLib/BootManagerUiLib.inf
       NULL|MdeModulePkg/Library/BootMaintenanceManagerUiLib/BootMaintenanceManagerUiLib.inf
@@ -698,7 +812,6 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
       NULL|ShellPkg/Library/UefiShellDriver1CommandsLib/UefiShellDriver1CommandsLib.inf
       NULL|ShellPkg/Library/UefiShellDebug1CommandsLib/UefiShellDebug1CommandsLib.inf
       NULL|ShellPkg/Library/UefiShellInstall1CommandsLib/UefiShellInstall1CommandsLib.inf
-      NULL|Silicon/Rockchip/Applications/I2cDemoTest/I2cDemoTest.inf
       NULL|Silicon/Rockchip/Applications/SpiTool/SpiFlashCmd.inf
       NULL|ShellPkg/Library/UefiShellNetwork1CommandsLib/UefiShellNetwork1CommandsLib.inf
       NULL|ShellPkg/Library/UefiShellAcpiViewCommandLib/UefiShellAcpiViewCommandLib.inf
@@ -715,8 +828,5 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
   ShellPkg/DynamicCommand/TftpDynamicCommand/TftpDynamicCommand.inf
 !endif #$(INCLUDE_TFTP_COMMAND)
 
-  # I2C Demo application
-  # Silicon/Rockchip/Applications/I2cDemoTest/I2cDemoTest.inf
-
-  # SPI Flash Cmd application
-  # Silicon/Rockchip/Applications/SpiTool/SpiFlashCmd.inf
+  # Maskrom Reset application
+  Silicon/Rockchip/Applications/MaskromReset/MaskromReset.inf

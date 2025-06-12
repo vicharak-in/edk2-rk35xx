@@ -2,7 +2,7 @@
 #
 #  Copyright (c) 2014-2018, Linaro Limited. All rights reserved.
 #  Copyright (c) 2023, Molly Sophia <mollysophia379@gmail.com>
-#  Copyright (c) 2023, Mario Bălănică <mariobalanica02@gmail.com>
+#  Copyright (c) 2023-2024, Mario Bălănică <mariobalanica02@gmail.com>
 #  Copyright (c) 2023, Sergey Tyuryukanov <s199p.wa1k9r@gmail.com>
 #
 #  SPDX-License-Identifier: BSD-2-Clause-Patent
@@ -61,7 +61,7 @@
   gRockchipTokenSpaceGuid.PcdPlatformVendorName|"FriendlyElec"
   gRockchipTokenSpaceGuid.PcdFamilyName|"NanoPi"
   gRockchipTokenSpaceGuid.PcdProductUrl|"https://wiki.friendlyelec.com/wiki/index.php/NanoPi_R6"
-  gRockchipTokenSpaceGuid.PcdDeviceTreeName|"rk3588s-nanopi-r6c.dtb"
+  gRockchipTokenSpaceGuid.PcdDeviceTreeName|"rk3588s-nanopi-r6c"
 
   # I2C
   gRockchipTokenSpaceGuid.PcdI2cSlaveAddresses|{ 0x42, 0x43, 0x51 }
@@ -72,13 +72,6 @@
   gRockchipTokenSpaceGuid.PcdRk860xRegulatorTags|{ $(SCMI_CLK_CPUB01), $(SCMI_CLK_CPUB23) }
   gPcf8563RealTimeClockLibTokenSpaceGuid.PcdI2cSlaveAddress|0x51
   gRockchipTokenSpaceGuid.PcdRtc8563Bus|0x6
-
-  #
-  # CPU Performance default values
-  #
-  gRK3588TokenSpaceGuid.PcdCPULClusterClockPresetDefault|$(CPU_PERF_CLUSTER_CLOCK_PRESET_BOOTDEFAULT)
-  gRK3588TokenSpaceGuid.PcdCPUB01ClusterClockPresetDefault|$(CPU_PERF_CLUSTER_CLOCK_PRESET_BOOTDEFAULT)
-  gRK3588TokenSpaceGuid.PcdCPUB23ClusterClockPresetDefault|$(CPU_PERF_CLUSTER_CLOCK_PRESET_BOOTDEFAULT)
 
   #
   # PCIe/SATA/USB Combo PIPE PHY support flags and default values
@@ -100,6 +93,13 @@
   gRK3588TokenSpaceGuid.PcdGmac1Supported|TRUE
   gRK3588TokenSpaceGuid.PcdGmac1TxDelay|0x42
 
+  #
+  # Display support flags and default values
+  #
+  gRK3588TokenSpaceGuid.PcdDisplayConnectors|{CODE({
+    VOP_OUTPUT_IF_HDMI0
+  })}
+
 ################################################################################
 #
 # Components Section - list of all EDK II Modules needed by this Platform.
@@ -109,6 +109,9 @@
   # ACPI Support
   $(PLATFORM_DIRECTORY)/AcpiTables/AcpiTables.inf
 
+  # Device Tree Support
+  $(PLATFORM_DIRECTORY)/DeviceTree/Vendor.inf
+  $(PLATFORM_DIRECTORY)/DeviceTree/Mainline.inf
+
   # Splash screen logo
   $(VENDOR_DIRECTORY)/Drivers/LogoDxe/LogoDxe.inf
-

@@ -1,5 +1,6 @@
 #/** @file
 #
+#  Copyright (c) 2023-2024, Mario Bălănică <mariobalanica02@gmail.com>
 #  Copyright (c) 2021, Jared McNeill <jmcneill@invisible.ca>
 #  Copyright (c) 2017-2021, Andrei Warkentin <andrey.warkentin@gmail.com>
 #  Copyright (c) 2014-2016, Linaro Limited. All rights reserved.
@@ -28,12 +29,16 @@
 
 [LibraryClasses]
   ArmLib
+  BaseVariableLib
   FdtLib
   IoLib
   MemoryAllocationLib
   PcdLib
   PrintLib
+  ResetUtilityLib
+  SaradcLib
   SdramLib
+  SerialPortLib
 
 [Sources.common]
   Rk3588.c
@@ -43,16 +48,15 @@
   Rk3588Helper.S
 
 [FixedPcd]
-  gArmTokenSpaceGuid.PcdFdBaseAddress
   gArmTokenSpaceGuid.PcdFvBaseAddress
+  gArmTokenSpaceGuid.PcdFvSize
   gEfiMdeModulePkgTokenSpaceGuid.PcdSerialRegisterBase
   gArmTokenSpaceGuid.PcdGicDistributorBase
   gArmTokenSpaceGuid.PcdGicRedistributorsBase
   gArmPlatformTokenSpaceGuid.PcdCoreCount
   gArmTokenSpaceGuid.PcdArmPrimaryCoreMask
   gArmTokenSpaceGuid.PcdArmPrimaryCore
-  gArmTokenSpaceGuid.PcdFdSize
-  gRockchipTokenSpaceGuid.PcdNvStorageVariableBase
+  gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableBase64
   gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageVariableSize
   gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwWorkingSize
   gEfiMdeModulePkgTokenSpaceGuid.PcdFlashNvStorageFtwSpareSize
@@ -62,5 +66,12 @@
   gArmTokenSpaceGuid.PcdSystemMemoryBase
   gArmTokenSpaceGuid.PcdSystemMemorySize
 
+[PatchPcd]
+  gEfiMdePkgTokenSpaceGuid.PcdUartDefaultBaudRate
+
 [Ppis]
   gArmMpCoreInfoPpiGuid
+
+[Guids]
+  gRK3588DxeFormSetGuid
+  gRockchipResetTypeMaskromGuid

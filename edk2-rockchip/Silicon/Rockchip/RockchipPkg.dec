@@ -1,7 +1,7 @@
 ## @file
 #
 #  Copyright (c) 2021-2022, Rockchip Limited. All rights reserved.
-#  Copyright (c) 2023, Mario Bălănică <mariobalanica02@gmail.com>
+#  Copyright (c) 2023-2025, Mario Bălănică <mariobalanica02@gmail.com>
 #
 #  SPDX-License-Identifier: BSD-2-Clause-Patent
 #
@@ -15,6 +15,8 @@
 
 [Includes]
   Include
+  devicetree/mainline/upstream/include
+  devicetree/mainline/upstream/src/arm64/rockchip
 
 [Protocols]
   gUniNorFlashProtocolGuid = { 0x86F305EA, 0xDFAC, 0x4A6B, { 0x92, 0x77, 0x47, 0x31, 0x2E, 0xCE, 0x42, 0xA } }
@@ -26,12 +28,24 @@
   gRockchipI2cMasterProtocolGuid = { 0x7b4af789, 0x43d2, 0x44a5, { 0xa0, 0xb3, 0x3f, 0xa5, 0xde, 0xd7, 0xa1, 0x27 } }
   gRockchipPlatformConfigAppliedProtocolGuid = { 0xdf0e9b10, 0xcbd6, 0x496f, { 0x83, 0xd6, 0xef, 0xbb, 0x96, 0x9c, 0xe5, 0x3d } }
   gDpPhyProtocolGuid = { 0xb4bcf881, 0xc8b3, 0x46d7, { 0xaf, 0xbe, 0x5a, 0x2d, 0x94, 0x9d, 0x93, 0xc3 } }
+  gPca95xxProtocolGuid = { 0x7e91391b, 0xa23c, 0x4a51, { 0x9d, 0xf7, 0xf6, 0x74, 0xef, 0x1d, 0x51, 0x1b } }
+  gRockchipDsiPanelProtocolGuid = { 0x07a5d05c, 0x3216, 0x49fc, { 0xb4, 0x22, 0x28, 0x9d, 0x38, 0xd5, 0xdf, 0x7e } }
+  gRockchipFirmwareBootDeviceProtocolGuid = { 0x8733765a, 0x3ce7, 0x47b5, { 0xb2, 0xc0, 0x39, 0x80, 0x68, 0xd5, 0x86, 0xb3 } }
+  gExitBootServicesOsNotifyProtocolGuid = { 0x8c254127, 0x3fd5, 0x4b75, { 0xbb, 0x13, 0x22, 0xe8, 0xb5, 0x3e, 0x64, 0x03 } }
+  gNetworkStackEnabledProtocolGuid = { 0x68ffbd01, 0x069c, 0x4aa6, { 0x99, 0x6f, 0x6f, 0x54, 0xb0, 0xa9, 0xe1, 0x1b } }
+  gNetworkStackIpv4EnabledProtocolGuid = { 0x704394a1, 0xba4d, 0x47e6, { 0xb2, 0x61, 0x23, 0x10, 0x59, 0xae, 0x11, 0x5b } }
+  gNetworkStackIpv6EnabledProtocolGuid = { 0xe5673e63, 0xfea0, 0x4fb0, { 0x95, 0xa3, 0xbe, 0xcb, 0x95, 0x63, 0xab, 0xcd } }
+  gNetworkStackPxeBootEnabledProtocolGuid = { 0x8887e946, 0x3576, 0x4cd5, { 0xa1, 0xdc, 0x41, 0xcb, 0x8f, 0x14, 0x0a, 0xc3 } }
+  gNetworkStackHttpBootEnabledProtocolGuid = { 0x23a52215, 0xaff5, 0x4eaa, { 0xb6, 0x52, 0x31, 0xc5, 0xb7, 0x95, 0x4c, 0x15 } }
 
 [Guids]
   gRockchipTokenSpaceGuid = { 0xc620b83a, 0x3175, 0x11ec, { 0x95, 0xb4, 0xf4, 0x2a, 0x7d, 0xcb, 0x92, 0x5d } }
   gShellSfHiiGuid = { 0x03a67756, 0x8cde, 0x4638, { 0x82, 0x34, 0x4a, 0x0f, 0x6d, 0x58, 0x81, 0x39 } }
   gShellI2cDemoHiiGuid = { 0xb2f4c714, 0x147f, 0x4ff7, { 0x82, 0x1b, 0xce, 0x7b, 0x91, 0x7f, 0x5f, 0x2f } }
-  gRockchipEventResetGuid = { 0x4ecbd617, 0xc2a6, 0x4d4c, { 0x80, 0x4e, 0x53, 0x38, 0x3b, 0x98, 0x7d, 0x75 } }
+  gRockchipEventPlatformBmAfterConsoleGuid = { 0xf1272c11, 0xb418, 0x40ca, { 0x88, 0x26, 0x11, 0x94, 0xd7, 0xb7, 0x30, 0x4a } }
+  gRockchipResetTypeMaskromGuid = { 0x44a5917b, 0x1f57, 0x467d, { 0x96, 0xe5, 0xb2, 0xc2, 0x22, 0x1f, 0xa7, 0x21 } }
+  gRockchipMaskromResetFileGuid = { 0x1f64e768, 0x9f2c, 0x4b39, { 0xa5, 0x4a, 0xf8, 0x4a, 0x31, 0xed, 0x6d, 0x6b } }
+  gNetworkStackConfigFormSetGuid = { 0x663413e7, 0xed00, 0x41f6, { 0xa8, 0x24, 0xa9, 0x88, 0xd0, 0x45, 0x9d, 0xc8 } }
 
 [PcdsFixedAtBuild]
   gRockchipTokenSpaceGuid.PcdProcessorName|"Unknown"|VOID*|0x00000001
@@ -43,6 +57,8 @@
   gRockchipTokenSpaceGuid.PcdMemoryVendorName|"Unknown"|VOID*|0x00000007
   gRockchipTokenSpaceGuid.PcdFamilyName|"Unknown"|VOID*|0x00000008
   gRockchipTokenSpaceGuid.PcdDeviceTreeName|"Unknown"|VOID*|0x00000009
+
+  gRockchipTokenSpaceGuid.PcdFitImageFlashAddress|0|UINT64|0x01000000
 
   gRockchipTokenSpaceGuid.PcdI2cSlaveAddresses|{ 0x0 }|VOID*|0x02000001
   gRockchipTokenSpaceGuid.PcdI2cSlaveBuses|{ 0x0 }|VOID*|0x02000002
@@ -59,6 +75,7 @@
   gRockchipTokenSpaceGuid.PcdRtc8563Bus|0|UINT8|0x0200000E
 
   gRockchipTokenSpaceGuid.PcdRkSdmmcBaseAddress|0x0|UINT32|0x40000030
+  gRockchipTokenSpaceGuid.PcdRkSdmmcCardDetectBroken|FALSE|BOOLEAN|0x40000031
 
   gRockchipTokenSpaceGuid.PcdDwcSdhciBaseAddress|0x0|UINT32|0x40000035
   gRockchipTokenSpaceGuid.PcdDwcSdhciForceHighSpeed|FALSE|BOOLEAN|0x40000036
@@ -77,15 +94,20 @@
   gRockchipTokenSpaceGuid.FspiBaseAddr|0|UINT64|0x21200003
   gRockchipTokenSpaceGuid.CruBaseAddr|0|UINT64|0x21200008
 
-  gRockchipTokenSpaceGuid.PcdNvStorageVariableBase|0|UINT32|0x21200005
-  gRockchipTokenSpaceGuid.PcdNvStorageFtwWorkingBase|0|UINT32|0x21200006
-  gRockchipTokenSpaceGuid.PcdNvStorageFtwSpareBase|0|UINT32|0x21200007
   gRockchipTokenSpaceGuid.PcdNvStoragePreferSpiFlash|FALSE|BOOLEAN|0x21200009
-
-  gRockchipTokenSpaceGuid.PcdLcdPixelFormat|0|UINT32|0x32000001
-  gRockchipTokenSpaceGuid.PcdEdpId|0|UINT32|0x32000003
-  gRockchipTokenSpaceGuid.PcdHdmiId|0|UINT32|0x32000004
 
   gRockchipTokenSpaceGuid.PcdRkMtlMailBoxBase|0x0010f000|UINT64|0x00001000
   gRockchipTokenSpaceGuid.PcdRkMtlMailBoxSize|0x100|UINT32|0x00001001
   gRockchipTokenSpaceGuid.PcdRkMtlMailBoxSmcId|0x82000010|UINT32|0x00010002
+
+  gRockchipTokenSpaceGuid.PcdPca9555Address|0|UINT8|0x03000001
+  gRockchipTokenSpaceGuid.PcdPca9555Bus|0|UINT8|0x03000002
+
+  gRockchipTokenSpaceGuid.PcdUartClkInHz|0|UINT32|0x04000001
+  gRockchipTokenSpaceGuid.PcdSerialPortSendDelay|0|UINT32|0x04000002
+
+  gRockchipTokenSpaceGuid.PcdNetworkStackEnabledDefault|FALSE|BOOLEAN|0x05000001
+  gRockchipTokenSpaceGuid.PcdNetworkStackIpv4EnabledDefault|FALSE|BOOLEAN|0x05000002
+  gRockchipTokenSpaceGuid.PcdNetworkStackIpv6EnabledDefault|FALSE|BOOLEAN|0x05000003
+  gRockchipTokenSpaceGuid.PcdNetworkStackPxeBootEnabledDefault|FALSE|BOOLEAN|0x05000004
+  gRockchipTokenSpaceGuid.PcdNetworkStackHttpBootEnabledDefault|FALSE|BOOLEAN|0x05000005

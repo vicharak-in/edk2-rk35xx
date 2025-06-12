@@ -32,12 +32,11 @@
 #include <Library/DrmModes.h>
 #include <Library/MediaBusFormat.h>
 #include <Library/DrmModes.h>
+#include <Library/uboot-env.h>
+#include <Library/drm_dp_helper.h>
 
 #include <Protocol/RockchipConnectorProtocol.h>
 #include <Protocol/DpPhy.h>
-
-#include "uboot-env.h"
-#include "drm_dp_helper.h"
 
 #define DPTX_VERSION_NUMBER			0x0000
 #define DPTX_VERSION_TYPE			0x0004
@@ -233,6 +232,7 @@ struct dw_dp_sdp {
 struct dw_dp {
 	UINT32 Signature;
 	ROCKCHIP_CONNECTOR_PROTOCOL connector;
+	UINT32 output_if;
 	UINTN regmap;
 	DP_PHY_PROTOCOL *phy;
 	struct reset_ctl reset;
@@ -1407,9 +1407,9 @@ static int dw_dp_connector_init(ROCKCHIP_CONNECTOR_PROTOCOL *conn, DISPLAY_STATE
 {
 	CONNECTOR_STATE *conn_state = &state->ConnectorState;
 	struct dw_dp *dp = DW_DP_FROM_CONNECTOR_PROTOCOL (conn);
-	int ret;
+	int ret = 0;
 
-	conn_state->OutputInterface |= dp->id ? VOP_OUTPUT_IF_DP1 : VOP_OUTPUT_IF_DP0;
+	conn_state->OutputInterface |= dp->output_if;
 	conn_state->OutputMode = ROCKCHIP_OUT_MODE_AAAA;
 	conn_state->ColorSpace = V4L2_COLORSPACE_DEFAULT;
 
@@ -1503,7 +1503,8 @@ static int dw_dp_connector_disable(ROCKCHIP_CONNECTOR_PROTOCOL *conn, DISPLAY_ST
 
 static int dw_dp_connector_detect(ROCKCHIP_CONNECTOR_PROTOCOL *conn, DISPLAY_STATE *state)
 {
-	return 0;
+	/* TODO */
+	return -ENODEV;
 }
 
 static int dw_dp_ddc_init(struct dw_dp *dp)
@@ -1552,7 +1553,7 @@ DwDpConnectorDetect (
 
 	ret = dw_dp_connector_detect(This, DisplayState);
 	if (ret)
-		return EFI_DEVICE_ERROR;
+		return EFI_NOT_FOUND;
 
 	return EFI_SUCCESS;
 }
@@ -1624,11 +1625,13 @@ static struct dw_dp mRk3588Dp[] = {
 		.regmap		= 0xfde50000,
 		.reset		= { 0xAE0, 8 },
 		.id		= 0,
+		.output_if      = VOP_OUTPUT_IF_DP0,
 	},
 	{
 		.regmap		= 0xfde60000,
 		.reset		= { 0xAE0, 9 },
 		.id		= 1,
+		.output_if      = VOP_OUTPUT_IF_DP1,
 	},
 };
 
@@ -1668,7 +1671,7 @@ DpPhyRegistrationEventHandler (
 
 		for (Index = 0; Index < ARRAY_SIZE (mRk3588Dp); Index++) {
 			DwDp = &mRk3588Dp[Index];
-			if (DwDp->id == DpPhy->Id) {
+			if (DwDp->id == DpPhy->Id && (PcdGet32 (PcdDisplayConnectorsMask) & DwDp->output_if)) {
 				DwDp->Signature = DW_DP_SIGNATURE;
 				DwDp->phy = DpPhy;
 				DwDp->force_output = TRUE;

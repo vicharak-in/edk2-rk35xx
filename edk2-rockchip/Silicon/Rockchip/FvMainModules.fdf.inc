@@ -1,7 +1,7 @@
 ## @file
 #
 #  Copyright (c) 2021-2022, Rockchip Limited. All rights reserved.
-#  Copyright (c) 2023, Mario Bălănică <mariobalanica02@gmail.com>
+#  Copyright (c) 2023-2025, Mario Bălănică <mariobalanica02@gmail.com>
 #
 #  SPDX-License-Identifier: BSD-2-Clause-Patent
 #
@@ -22,6 +22,30 @@
   INF EmbeddedPkg/RealTimeClockRuntimeDxe/RealTimeClockRuntimeDxe.inf
   INF EmbeddedPkg/MetronomeDxe/MetronomeDxe.inf
   INF MdeModulePkg/Universal/HiiDatabaseDxe/HiiDatabaseDxe.inf
+!if $(SECURE_BOOT_ENABLE) == TRUE
+!include ArmPlatformPkg/SecureBootDefaultKeys.fdf.inc
+  INF SecurityPkg/VariableAuthenticated/SecureBootConfigDxe/SecureBootConfigDxe.inf
+  INF SecurityPkg/VariableAuthenticated/SecureBootDefaultKeysDxe/SecureBootDefaultKeysDxe.inf
+!endif
+  INF SecurityPkg/RandomNumberGenerator/RngDxe/RngDxe.inf
+  INF SecurityPkg/Hash2DxeCrypto/Hash2DxeCrypto.inf
+
+  #
+  # ExitBootServices hook manager
+  #
+  INF Silicon/Rockchip/Drivers/ExitBootServicesHookDxe/ExitBootServicesHookDxe.inf
+
+  #
+  # Runtime Services state manager
+  #
+  INF Silicon/Rockchip/Drivers/RuntimeServicesManagerDxe/RuntimeServicesManagerDxe.inf
+
+  #
+  # Status LED support
+  #
+!if $(RK_STATUS_LED_ENABLE) == TRUE
+  INF Silicon/Rockchip/Drivers/StatusLedDxe/StatusLedDxe.inf
+!endif
 
   #
   # Non-volatile FVB support
@@ -49,7 +73,7 @@
   #
   # Arm GIC
   #
-  INF ArmPkg/Drivers/ArmGic/ArmGicDxe.inf
+  INF ArmPkg/Drivers/ArmGicDxe/ArmGicV3Dxe.inf
 
   #
   # Timer
@@ -69,11 +93,6 @@
   INF MdeModulePkg/Universal/Acpi/BootGraphicsResourceTableDxe/BootGraphicsResourceTableDxe.inf
 
   #
-  # DeviceTree Support
-  #
-  INF EmbeddedPkg/Drivers/DtPlatformDxe/DtPlatformDxe.inf
-
-  #
   # SMBIOS Support
   #
   INF MdeModulePkg/Universal/SmbiosDxe/SmbiosDxe.inf
@@ -90,15 +109,22 @@
 !if $(RK_RTC8563_ENABLE) == TRUE
   INF Silicon/Rockchip/Drivers/Rtc8563PlatformDxe/Rtc8563PlatformDxe.inf
 !endif
-  # INF Silicon/Rockchip/Drivers/I2c/I2cDemoDxe/I2cDemoDxe.inf
+!if $(RK_PCA9555_ENABLE) == TRUE
+  INF Silicon/Rockchip/Drivers/Pca9555Dxe/Pca9555Dxe.inf
+!endif
 
   #
   # Display Support
   #
   INF Silicon/Rockchip/Drivers/Vop2Dxe/Vop2Dxe.inf
-  # INF Silicon/Rockchip/Library/DisplayLib/AnalogixDpLib.inf
+!if $(RK_ANALOGIX_DP_ENABLE) == TRUE
+  INF Silicon/Rockchip/Library/DisplayLib/AnalogixDpLib.inf
+!endif
+!if $(RK_DW_HDMI_QP_ENABLE) == TRUE
   INF Silicon/Rockchip/Library/DisplayLib/DwHdmiQpLib.inf
+!endif
   INF Silicon/Rockchip/Library/DisplayLib/DwDpLib.inf
+  INF Silicon/Rockchip/Library/DisplayLib/DwMipiDsi2Lib.inf
   INF Silicon/Rockchip/Drivers/LcdGraphicsOutputDxe/LcdGraphicsOutputDxe.inf
 
   #
@@ -161,7 +187,13 @@
   INF MdeModulePkg/Universal/Disk/DiskIoDxe/DiskIoDxe.inf
   INF MdeModulePkg/Universal/Disk/PartitionDxe/PartitionDxe.inf
   INF FatPkg/EnhancedFatDxe/Fat.inf
+!include Features/Ext4Pkg/Ext4.fdf.inc
   INF MdeModulePkg/Universal/Disk/UnicodeCollation/EnglishDxe/EnglishDxe.inf
+
+  #
+  # RAM Disk Support
+  #
+  INF MdeModulePkg/Universal/Disk/RamDiskDxe/RamDiskDxe.inf
 
   #
   # UEFI Network Stack
@@ -169,6 +201,11 @@
 !include NetworkPkg/Network.fdf.inc
 
 !if $(NETWORK_ENABLE) == TRUE
+  #
+  # Network Stack Configuration Driver
+  #
+  INF Silicon/Rockchip/Drivers/NetworkStackConfigDxe/NetworkStackConfigDxe.inf
+
   #
   # Realtek PCIe UNDI Driver
   #
@@ -178,16 +215,17 @@
   # Realtek USB UNDI Driver
   #
   INF Drivers/Realtek/Bus/Usb/UsbNetworking/RtkUsbUndiDxe.inf
+!endif
 
   #
-  # AX88772 Ethernet Driver for Apple Ethernet Adapter
+  # EFI Memory Attribute Protocol state manager (rhboot shim workaround)
   #
-  INF Drivers/ASIX/Bus/Usb/UsbNetworking/Ax88772c/Ax88772c.inf
-!endif
+  INF EmbeddedPkg/Drivers/MemoryAttributeManagerDxe/MemoryAttributeManagerDxe.inf
 
   #
   # Bds
   #
+  INF MdeModulePkg/Universal/BootManagerPolicyDxe/BootManagerPolicyDxe.inf
   INF MdeModulePkg/Universal/DevicePathDxe/DevicePathDxe.inf
   INF MdeModulePkg/Universal/SetupBrowserDxe/SetupBrowserDxe.inf
   INF MdeModulePkg/Universal/DisplayEngineDxe/DisplayEngineDxe.inf
@@ -202,8 +240,5 @@
   INF ShellPkg/DynamicCommand/TftpDynamicCommand/TftpDynamicCommand.inf
 !endif #$(INCLUDE_TFTP_COMMAND)
 
-  # I2C Demo application
-  # INF Silicon/Rockchip/Applications/I2cDemoTest/I2cDemoTest.inf
-
-  # SPI Flash Cmd application
-  # INF Silicon/Rockchip/Applications/SpiTool/SpiFlashCmd.inf
+  # Maskrom Reset application
+  INF Silicon/Rockchip/Applications/MaskromReset/MaskromReset.inf

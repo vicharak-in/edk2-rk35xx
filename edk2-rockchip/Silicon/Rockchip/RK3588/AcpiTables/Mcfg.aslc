@@ -3,75 +3,100 @@
  *  PCI Express Memory-mapped Configuration Space base address description table (MCFG)
  *
  *  Copyright (c) 2021, Jared McNeill <jmcneill@invisible.ca>
- *  Copyright (c) 2023, Mario Bălănică <mariobalanica02@gmail.com>
+ *  Copyright (c) 2024, Mario Bălănică <mariobalanica02@gmail.com>
  *
  *  SPDX-License-Identifier: BSD-2-Clause-Patent
  *
  **/
 
-#include <IndustryStandard/Acpi.h>
-#include <IndustryStandard/MemoryMappedConfigurationSpaceAccessTable.h>
 #include "AcpiTables.h"
 
-#pragma pack(push, 1)
-
 //
-// The root port config is not part of ECAM.
-// OSes can parse additional config spaces in MCFG, but we'll hide it for now.
+// MCFG is patched by AcpiPlatformDxe.
 //
 
-typedef struct {
-  EFI_ACPI_MEMORY_MAPPED_CONFIGURATION_BASE_ADDRESS_TABLE_HEADER Header;
-  EFI_ACPI_MEMORY_MAPPED_ENHANCED_CONFIGURATION_SPACE_BASE_ADDRESS_ALLOCATION_STRUCTURE Entry[5];
-} EFI_ACPI_MEMORY_MAPPED_CONFIGURATION_SPACE_ACCESS_DESCRIPTION_TABLE;
-
-EFI_ACPI_MEMORY_MAPPED_CONFIGURATION_SPACE_ACCESS_DESCRIPTION_TABLE Mcfg = {
+RK3588_MCFG_TABLE  Mcfg = {
   {
     ACPI_HEADER (
       EFI_ACPI_6_4_PCI_EXPRESS_MEMORY_MAPPED_CONFIGURATION_SPACE_BASE_ADDRESS_DESCRIPTION_TABLE_SIGNATURE,
-      EFI_ACPI_MEMORY_MAPPED_CONFIGURATION_SPACE_ACCESS_DESCRIPTION_TABLE,
+      RK3588_MCFG_TABLE,
       EFI_ACPI_MEMORY_MAPPED_CONFIGURATION_SPACE_ACCESS_TABLE_REVISION
       ),
   },
-  {
+  { // Main config space
     {
-      0x0000000900000000 + 0x8000,
+      PCIE_CFG_BASE (0),
       0,  // PciSegmentNumber
       1,  // PciBusMin
       1,  // PciBusMax
       0   // Reserved
     },
     {
-      0x0000000940000000 + 0x8000,
+      PCIE_CFG_BASE (1),
       1,  // PciSegmentNumber
       1,  // PciBusMin
       1,  // PciBusMax
       0   // Reserved
     },
     {
-      0x0000000980000000 + 0x8000,
+      PCIE_CFG_BASE (2),
       2,  // PciSegmentNumber
       1,  // PciBusMin
       1,  // PciBusMax
       0   // Reserved
     },
     {
-      0x00000009C0000000 + 0x8000,
+      PCIE_CFG_BASE (3),
       3,  // PciSegmentNumber
       1,  // PciBusMin
       1,  // PciBusMax
       0   // Reserved
     },
     {
-      0x0000000A00000000 + 0x8000,
+      PCIE_CFG_BASE (4),
       4,  // PciSegmentNumber
       1,  // PciBusMin
       1,  // PciBusMax
       0   // Reserved
     }
+  },
+  { // Root Port DBI config space (for Windows)
+    {
+      PCIE_DBI_BASE (0),
+      0,  // PciSegmentNumber
+      0,  // PciBusMin
+      0,  // PciBusMax
+      0   // Reserved
+    },
+    {
+      PCIE_DBI_BASE (1),
+      1,  // PciSegmentNumber
+      0,  // PciBusMin
+      0,  // PciBusMax
+      0   // Reserved
+    },
+    {
+      PCIE_DBI_BASE (2),
+      2,  // PciSegmentNumber
+      0,  // PciBusMin
+      0,  // PciBusMax
+      0   // Reserved
+    },
+    {
+      PCIE_DBI_BASE (3),
+      3,  // PciSegmentNumber
+      0,  // PciBusMin
+      0,  // PciBusMax
+      0   // Reserved
+    },
+    {
+      PCIE_DBI_BASE (4),
+      4,  // PciSegmentNumber
+      0,  // PciBusMin
+      0,  // PciBusMax
+      0   // Reserved
+    }
   }
 };
 
-#pragma pack(pop)
-
-VOID* CONST ReferenceAcpiTable = &Mcfg;
+VOID *CONST  ReferenceAcpiTable = &Mcfg;

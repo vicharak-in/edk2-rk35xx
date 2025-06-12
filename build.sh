@@ -1,230 +1,256 @@
 #!/bin/bash
 
 function _help(){
-	echo "Usage: build.sh --device DEV"
-	echo
-	echo "Build edk2 for Rockchip RK35xx platforms."
-	echo
-	echo "Options: "
-	echo "	--device DEV, -d DEV:    build for DEV."
-	echo "	--all, -a:               build all devices."
-	echo "	--gui:                   Enable simple-init GUI."
-	echo "	--release MODE, -r MODE: Release mode for building, default is 'DEBUG', 'RELEASE' alternatively."
-	echo "	--toolchain TOOLCHAIN:   Set toolchain, default is 'GCC5'."
-	echo " 	--skip-rootfs-gen:       skip generating SimpleInit rootfs to speed up building."
-	echo "	--clean, -C:             clean workspace and output."
-	echo "	--distclean, -D:         clean up all files that are not in repo."
-	echo "	--outputdir, -O:         output folder."
-	echo "	--help, -h:              show this help."
-	echo
-	exit "${1}"
+    echo
+    echo "Build EDK2 for Rockchip RK3588 platforms."
+    echo
+    echo "Usage: build.sh [options]"
+    echo
+    echo "Options:"
+    echo "  -d, --device DEV            Build for DEV, or 'all'."
+    echo "  -r, --release MODE          Release mode for building, default is 'DEBUG', 'RELEASE' alternatively."
+    echo "  -t, --toolchain TOOLCHAIN   Set toolchain, default is 'GCC'."
+    echo "  --open-tfa ENABLE           Use open-source TF-A submodule. Default: ${OPEN_TFA}"
+    echo "  -C, --clean                 Clean workspace and output."
+    echo "  -D, --distclean             Clean up all files that are not in repo."
+    echo "  --tfa-flags \"FLAGS\"         Flags appended to open TF-A build process."
+    echo "  --edk2-flags \"FLAGS\"        Flags appended to the EDK2 build process."
+    echo "  -h, --help                  Show this help."
+    echo
+    exit "${1}"
 }
 
-function _error(){ echo "${@}" >&2;exit 1; }
+function _error() { echo "${@}" >&2; exit 1; }
 
-MACHINE_TYPE=`uname -m`
+function _build_idblock() {
+    echo " => Building idblock.bin"
+    pushd ${WORKSPACE}
 
-# Fix-up possible differences in reported arch
-if [ ${MACHINE_TYPE} == 'arm64' ]; then
-	MACHINE_TYPE='aarch64'
-elif [ ${MACHINE_TYPE} == 'amd64' ]; then
-	MACHINE_TYPE='x86_64'
-fi
+    FLASHFILES="FlashHead.bin FlashData.bin FlashBoot.bin"
+    rm -f rk35*_spl_loader_*.bin idblock.bin rk35*_ddr_*.bin rk35*_usbplug*.bin UsbHead.bin ${FLASHFILES}
 
-function _build_idblock(){
-	echo " => Building idblock.bin"
-	pushd ${WORKSPACE}
-	FLASHFILES="FlashHead.bin FlashData.bin FlashBoot.bin"
-	rm -f rk35*_spl_loader_*.bin idblock.bin rk35*_ddr_*.bin rk35*_usbplug*.bin UsbHead.bin ${FLASHFILES}
+    DDRBIN_RKBIN=$(grep '^FlashData' ${ROOTDIR}/misc/rkbin/RKBOOT/${MINIALL_INI} | cut -d = -f 2-)
+    SPL_RKBIN=$(grep '^FlashBoot' ${ROOTDIR}/misc/rkbin/RKBOOT/${MINIALL_INI} | cut -d = -f 2-)
 
-	# Create idblock.bin
-	${ROOTDIR}/misc/tools/${MACHINE_TYPE}/mkimage -n rk3588 -T rksd -d ${ROOTDIR}/misc/rkbin/bin/rk35/rk3588_ddr_lp4_2112MHz_lp5_2736MHz_v1.11.bin:${ROOTDIR}/misc/rkbin/bin/rk35/rk3588_spl_v1.12.bin idblock.bin
-	popd
-	echo " => idblock.bin build done"
+    DDRBIN="${ROOTDIR}/misc/rkbin/${DDRBIN_RKBIN}"
+
+    #
+    # SPL v1.13 has broken SD card support!
+    # Use v1.12 instead.
+    #
+    # SPL="${ROOTDIR}/misc/rkbin/${SPL_RKBIN}"
+    SPL="${ROOTDIR}/misc/rk3588_spl_v1.12.bin"
+
+    # Create idblock.bin
+    ${ROOTDIR}/misc/tools/${MACHINE_TYPE}/mkimage -n rk3588 -T rksd -d ${DDRBIN}:${SPL} idblock.bin
+
+    popd
+    echo " => idblock.bin build done"
 }
 
-function _build_fit(){
-	echo " => Building FIT"
-	pushd ${WORKSPACE}
-	BL31=$(grep '^PATH=.*_bl31_' ${ROOTDIR}/misc/rkbin/RKTRUST/${TRUST_INI} | cut -d = -f 2-)
-	BL32=$(grep '^PATH=.*_bl32_' ${ROOTDIR}/misc/rkbin/RKTRUST/${TRUST_INI} | cut -d = -f 2-)
-	rm -f bl31_0x*.bin ${WORKSPACE}/BL33_AP_UEFI.Fv ${SOC_L}_${DEVICE}_EFI.its
+function _build_fit() {
+    echo " => Building FIT"
+    pushd ${WORKSPACE}
 
-	${ROOTDIR}/misc/extractbl31.py ${ROOTDIR}/misc/rkbin/${BL31}
-	cp ${ROOTDIR}/misc/rkbin/${BL32} ${WORKSPACE}/bl32.bin
-	cp ${ROOTDIR}/misc/${SOC_L}_spl.dtb ${WORKSPACE}/${DEVICE}.dtb
-	cp ${WORKSPACE}/Build/${PLATFORM_NAME}/${_MODE}_${TOOLCHAIN}/FV/BL33_AP_UEFI.Fv ${WORKSPACE}/
-	cat ${ROOTDIR}/misc/uefi_${SOC_L}.its | sed "s,@DEVICE@,${DEVICE},g" > ${SOC_L}_${DEVICE}_EFI.its
-	${ROOTDIR}/misc/tools/${MACHINE_TYPE}/mkimage -f ${SOC_L}_${DEVICE}_EFI.its -E ${DEVICE}_EFI.itb
+    BL31_RKBIN=$(grep '^PATH=.*_bl31_' ${ROOTDIR}/misc/rkbin/RKTRUST/${TRUST_INI} | cut -d = -f 2-)
+    BL32_RKBIN=$(grep '^PATH=.*_bl32_' ${ROOTDIR}/misc/rkbin/RKTRUST/${TRUST_INI} | cut -d = -f 2-)
 
-	popd
-	echo " => FIT build done"
+    BL31="${ROOTDIR}/misc/rkbin/${BL31_RKBIN}"
+    BL32="${ROOTDIR}/misc/rkbin/${BL32_RKBIN}"
+
+    if [ ${OPEN_TFA} == 1 ]; then
+        BL31="${ROOTDIR}/arm-trusted-firmware/build/${TFA_PLAT}/${RELEASE_TYPE,,}/bl31/bl31.elf"
+    fi
+
+    rm -f bl31_0x*.bin ${WORKSPACE}/BL33_AP_UEFI.Fv ${SOC_L}_${DEVICE}_EFI.its
+
+    ${ROOTDIR}/misc/extractbl31.py ${BL31}
+    if [ ! -f bl31_0x000f0000.bin ]; then
+        # Not used but FIT expects it.
+        touch bl31_0x000f0000.bin
+    fi
+
+    cp ${BL32} ${WORKSPACE}/bl32.bin
+    cp ${ROOTDIR}/misc/${SOC_L}_spl.dtb ${WORKSPACE}/${DEVICE}.dtb
+    cp ${WORKSPACE}/Build/${PLATFORM_NAME}/${RELEASE_TYPE}_${TOOLCHAIN}/FV/BL33_AP_UEFI.Fv ${WORKSPACE}/
+    cat ${ROOTDIR}/misc/uefi_${SOC_L}.its | sed "s,@DEVICE@,${DEVICE},g" > ${SOC_L}_${DEVICE}_EFI.its
+    ${ROOTDIR}/misc/tools/${MACHINE_TYPE}/mkimage -f ${SOC_L}_${DEVICE}_EFI.its -E ${DEVICE}_EFI.itb
+
+    popd
+    echo " => FIT build done"
 }
 
-function _pack(){
-	_build_idblock
-	_build_fit
+function _pack_image() {
+    _build_idblock
+    _build_fit
 
-	echo " => Building 8MB NOR FLASH IMAGE"
-	cp ${WORKSPACE}/Build/${PLATFORM_NAME}/${_MODE}_${TOOLCHAIN}/FV/NOR_FLASH_IMAGE.fd ${WORKSPACE}/RK3588_NOR_FLASH.img
+    echo " => Building 8MB NOR FLASH IMAGE"
+    cp ${WORKSPACE}/Build/${PLATFORM_NAME}/${RELEASE_TYPE}_${TOOLCHAIN}/FV/NOR_FLASH_IMAGE.fd ${WORKSPACE}/RK3588_NOR_FLASH.img
 
-	# might be GPT table? size:0x4400
-	dd if=${ROOTDIR}/misc/rk3588_spi_nor_gpt.img of=${WORKSPACE}/RK3588_NOR_FLASH.img
-	# idblock at 0x8000
-	dd if=${WORKSPACE}/idblock.bin of=${WORKSPACE}/RK3588_NOR_FLASH.img bs=1K seek=32
-	# FIT Image at 0x100000
-	dd if=${WORKSPACE}/${DEVICE}_EFI.itb of=${WORKSPACE}/RK3588_NOR_FLASH.img bs=1K seek=1024
-	cp ${WORKSPACE}/RK3588_NOR_FLASH.img ${ROOTDIR}/
+    # GPT at 0x0, size:0x4400
+    dd if=${ROOTDIR}/misc/rk3588_spi_nor_gpt.img of=${WORKSPACE}/RK3588_NOR_FLASH.img
+    # idblock at 0x8000
+    dd if=${WORKSPACE}/idblock.bin of=${WORKSPACE}/RK3588_NOR_FLASH.img bs=1K seek=32
+    # FIT Image at 0x100000
+    dd if=${WORKSPACE}/${DEVICE}_EFI.itb of=${WORKSPACE}/RK3588_NOR_FLASH.img bs=1K seek=1024
+    cp ${WORKSPACE}/RK3588_NOR_FLASH.img ${ROOTDIR}/
 }
 
 function _build(){
-	local DEVICE="${1}"
-	shift
-	[ -d "${WORKSPACE}/Conf" ]||mkdir -p "${WORKSPACE}/Conf"
-	source "${ROOTDIR}/edk2/edksetup.sh"
-	[ -d "${WORKSPACE}" ]||mkdir "${WORKSPACE}"
-	set -x
-	make -C "${ROOTDIR}/edk2/BaseTools"||exit "$?"
+    local DEVICE="${1}"; shift
 
-	EXT=""
+    #
+    # Grab platform parameters
+    #
+    if [ -f "configs/${DEVICE}.conf" ]
+    then source "configs/${DEVICE}.conf"
+    else _error "Device configuration not found"
+    fi
+    if [ -f "configs/${SOC}.conf" ]
+    then source "configs/${SOC}.conf"
+    else _error "SoC configuration not found"
+    fi
+    typeset -l SOC_L="$SOC"
 
-	if [ -f "configs/${DEVICE}.conf" ]
-	then source "configs/${DEVICE}.conf"
-	else _error "Device configuration not found"
-	fi
-	if [ -f "configs/${SOC}.conf" ]
-	then source "configs/${SOC}.conf"
-	else _error "SoC configuration not found"
-	fi
-	typeset -l SOC_L="$SOC"
+    rm -f "${OUTDIR}/RK35*_NOR_FLASH.img"
 
-	# based on the instructions from edk2-platform
-	rm -f "${OUTDIR}/RK35*_NOR_FLASH.img"
+    #
+    # Build TF-A
+    #
+    if [ ${OPEN_TFA} == 1 ]; then
+        pushd arm-trusted-firmware
 
-	case "${MODE}" in
-		RELEASE) _MODE=RELEASE;;
-		*) _MODE=DEBUG;;
-	esac
+        if [ ${RELEASE_TYPE} == "DEBUG" ]; then
+            DEBUG=1
+        else
+            DEBUG=0
+        fi
 
-	build \
-		-s \
-		-n 0 \
-		-a AARCH64 \
-		-t "${TOOLCHAIN}" \
-		-p "${ROOTDIR}/${DSC_FILE}" \
-		-b "${_MODE}" \
-		-D FIRMWARE_VER="${GITCOMMIT}" \
-		-D ENABLE_SIMPLE_INIT="${BUILD_GUI}" \
-		-D CONFIG_SOC="${SOC}" \
-		||return "$?"
+        make PLAT=${TFA_PLAT} DEBUG=${DEBUG} all ${TFA_FLAGS}
 
-	_pack
-	set +x
+        popd
+    fi
 
-	echo "Build done: RK3588_NOR_FLASH.img"
+    #
+    # Build EDK2
+    #
+    [ -d "${WORKSPACE}/Conf" ] || mkdir -p "${WORKSPACE}/Conf"
+
+    export GCC_AARCH64_PREFIX="${CROSS_COMPILE}"
+    export CLANG38_AARCH64_PREFIX="${CROSS_COMPILE}"
+    export PACKAGES_PATH="${ROOTDIR}/edk2:${ROOTDIR}/edk2-rockchip:${ROOTDIR}/devicetree:${ROOTDIR}/edk2-non-osi:${ROOTDIR}/edk2-platforms:${ROOTDIR}"
+
+    make -C "${ROOTDIR}/edk2/BaseTools"
+    source "${ROOTDIR}/edk2/edksetup.sh"
+
+    build \
+        -s \
+        -n 0 \
+        -a AARCH64 \
+        -t "${TOOLCHAIN}" \
+        -p "${ROOTDIR}/${DSC_FILE}" \
+        -b "${RELEASE_TYPE}" \
+        -D FIRMWARE_VER="${GIT_COMMIT}" \
+        -D NETWORK_ALLOW_HTTP_CONNECTIONS=TRUE \
+        -D NETWORK_ISCSI_ENABLE=TRUE \
+        -D INCLUDE_TFTP_COMMAND=TRUE \
+        --pcd gRockchipTokenSpaceGuid.PcdFitImageFlashAddress=0x100000 \
+        ${EDK2_FLAGS}
+
+    #
+    # Compile final image
+    #
+    _pack_image
+
+    echo "Build done: RK3588_NOR_FLASH.img"
 }
 
-function _clean(){ rm --one-file-system --recursive --force "${OUTDIR}"/workspace "${OUTDIR}"/RK3588_*.img "${OUTDIR}"/uefi-*.img*; }
+function _clean() { rm --one-file-system --recursive --force "${OUTDIR}"/workspace "${OUTDIR}"/RK3588_*.img; }
+function _distclean() { if [ -d .git ]; then git clean -xdf; else _clean; fi; }
 
-function _distclean(){ if [ -d .git ];then git clean -xdf;else _clean;fi; }
-
-OUTDIR="${PWD}"
-ROOTDIR="$(realpath "$(dirname "$0")")"
-cd "${ROOTDIR}"||exit 1
+#
+# Default variables
+#
 typeset -l DEVICE
-typeset -u MODE
+typeset -u RELEASE_TYPE
 DEVICE=""
-MODE=DEBUG
+RELEASE_TYPE=DEBUG
+TOOLCHAIN=GCC
+OPEN_TFA=1
+TFA_FLAGS=""
+EDK2_FLAGS=""
 CLEAN=false
 DISTCLEAN=false
-TOOLCHAIN=GCC5
-export ROOTDIR OUTDIR
-export GEN_ROOTFS=true
-export BUILD_GUI=false
-OPTS="$(getopt -o t:d:haCDO:r -l toolchain:,device:,help,all,skip-rootfs-gen,gui,clean,distclean,outputdir:,release: -n 'build.sh' -- "$@")"||exit 1
+OUTDIR="${PWD}"
+
+#
+# Get options
+#
+OPTS=$(getopt -o "d:r:t:CDh" -l "device:,release:,toolchain:,open-tfa:,tfa-flags:,edk2-flags:,clean,distclean,help" -n build.sh -- "${@}") || _help $?
 eval set -- "${OPTS}"
-while true
-do	case "${1}" in
-		-d|--device) DEVICE="${2}";shift 2;;
-		-a|--all) DEVICE=all;shift;;
-		-C|--clean) CLEAN=true;shift;;
-		-D|--distclean) DISTCLEAN=true;shift;;
-		-O|--outputdir) OUTDIR="${2}";shift 2;;
-		--skip-rootfs-gen) GEN_ROOTFS=false;shift;;
-		--gui) BUILD_GUI=true;shift;;
-		-r|--release) MODE="${2}";shift 2;;
-		-t|--toolchain) TOOLCHAIN="${2}";shift 2;;
-		-h|--help) _help 0;shift;;
-		--) shift;break;;
-		*) _help 1;;
-	esac
+while true; do
+    case "${1}" in
+        -d|--device) DEVICE="${2}"; shift 2 ;;
+        -r|--release) RELEASE_TYPE="${2}"; shift 2 ;;
+        -t|--toolchain) TOOLCHAIN="${2}"; shift 2 ;;
+        --open-tfa) OPEN_TFA="${2}"; shift 2 ;;
+        --tfa-flags) TFA_FLAGS="${2}"; shift 2 ;;
+        --edk2-flags) EDK2_FLAGS="${2}"; shift 2 ;;
+        -C|--clean) CLEAN=true; shift ;;
+        -D|--distclean) DISTCLEAN=true; shift ;;
+        -h|--help) _help 0; shift ;;
+        --) shift; break ;;
+        *) break ;;
+    esac
 done
-if "${DISTCLEAN}";then _distclean;exit "$?";fi
-if "${CLEAN}";then _clean;exit "$?";fi
-[ -z "${DEVICE}" ]&&_help 1
-
-if ! [ -f edk2/edksetup.sh ] && ! [ -f ../edk2/edksetup.sh ]
-then
-	set -e
-	echo "SKIP Updating submodules"
-	set +e
+if [[ -n "${@}" ]]; then
+    echo "Invalid additional arguments '${@}'"
+    _help 1
 fi
 
-for i in "${SIMPLE_INIT}" ./simple-init ../simple-init
-do
-	if [ -n "${i}" ]&&[ -f "${i}/SimpleInit.inc" ]
-	then
-		_SIMPLE_INIT="$(realpath "${i}")"
-		break
-	fi
-done
+if "${DISTCLEAN}"; then _distclean; exit "$?"; fi
+if "${CLEAN}"; then _clean; exit "$?"; fi
 
-[ -n "${_SIMPLE_INIT}" ]||[ ${BUILD_GUI} == false ]||error "SimpleInit not found, please see README.md"
-[ -f "configs/${DEVICE}.conf" ]||[ "${DEVICE}" == "all" ]||_error "Device configuration not found"
+[ -z "${DEVICE}" ] && _help 1
+[ -f "configs/${DEVICE}.conf" ] || [ "${DEVICE}" == "all" ] || _error "Device configuration not found"
 
-export CROSS_COMPILE="${CROSS_COMPILE:-aarch64-linux-gnu-}"
-export GCC5_AARCH64_PREFIX="${CROSS_COMPILE}"
-export CLANG38_AARCH64_PREFIX="${CROSS_COMPILE}"
-# export PACKAGES_PATH="$_EDK2:$_EDK2_PLATFORMS:$_SIMPLE_INIT:$PWD"
-export PACKAGES_PATH="${ROOTDIR}/edk2:${ROOTDIR}/edk2-platforms:${ROOTDIR}/edk2-rockchip:${ROOTDIR}/edk2-non-osi:${ROOTDIR}:${_SIMPLE_INIT}"
+#
+# Get machine architecture
+#
+MACHINE_TYPE=$(uname -m)
+
+# Fix-up possible differences in reported arch
+if [ ${MACHINE_TYPE} == 'arm64' ]; then
+    MACHINE_TYPE='aarch64'
+elif [ ${MACHINE_TYPE} == 'amd64' ]; then
+    MACHINE_TYPE='x86_64'
+fi
+
+if [ ${MACHINE_TYPE} != 'aarch64' ]; then
+    export CROSS_COMPILE="${CROSS_COMPILE:-aarch64-linux-gnu-}"
+fi
+
+GIT_COMMIT="$(git describe --tags --always)" || GIT_COMMIT="unknown"
+
 export WORKSPACE="${OUTDIR}/workspace"
-GITCOMMIT="$(git describe --tags --always)"||GITCOMMIT="unknown"
-export GITCOMMIT
+[ -d "${WORKSPACE}" ] || mkdir "${WORKSPACE}"
+
+ROOTDIR="$(realpath "$(dirname "$0")")"
+cd "${ROOTDIR}" || exit 1
+
+# Exit on first error
 set -e
-
-if "${BUILD_GUI}"
-then
-	mkdir -p "${_SIMPLE_INIT}/build" "${_SIMPLE_INIT}/root/usr/share/locale"
-	for i in "${_SIMPLE_INIT}/po/"*.po
-	do
-		[ -f "${i}" ]||continue
-		_name="$(basename "$i" .po)"
-		_path="${_SIMPLE_INIT}/root/usr/share/locale/${_name}/LC_MESSAGES"
-		mkdir -p "${_path}"
-		msgfmt -o "${_path}/simple-init.mo" "${i}"
-	done
-
-	if "${GEN_ROOTFS}"
-	then
-		bash "${_SIMPLE_INIT}/scripts/gen-rootfs-source.sh" \
-			"${_SIMPLE_INIT}" \
-			"${_SIMPLE_INIT}/build"
-	fi
-fi
 
 if [ "${DEVICE}" == "all" ]
 then
-	E=0
-	for i in configs/*.conf
-	do
-		DEV="$(basename "$i" .conf)"
-		if [ "${DEV}" != "RK3588" ]&&[ "${DEV}" != "RK3568" ]
-		then
-			echo "Building ${DEV}"
-			_build "${DEV}"||E="$?"
-		fi
-	done
-	exit "${E}"
+    for i in configs/*.conf; do
+        DEV="$(basename "$i" .conf)"
+        if [ "${DEV}" != "RK3588" ]
+        then
+            echo "Building ${DEV}"
+            _build "${DEV}"
+        fi
+    done
 else
-	_build "${DEVICE}"
+    _build "${DEVICE}"
 fi

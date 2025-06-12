@@ -2,7 +2,7 @@
 #
 #  Copyright (c) 2014-2018, Linaro Limited. All rights reserved.
 #  Copyright (c) 2023, Molly Sophia <mollysophia379@gmail.com>
-#  Copyright (c) 2023, Mario Bălănică <mariobalanica02@gmail.com>
+#  Copyright (c) 2023-2024, Mario Bălănică <mariobalanica02@gmail.com>
 #
 #  SPDX-License-Identifier: BSD-2-Clause-Patent
 #
@@ -54,22 +54,15 @@
   gRockchipTokenSpaceGuid.PcdPlatformVendorName|"Radxa"
   gRockchipTokenSpaceGuid.PcdFamilyName|"ROCK 5"
   gRockchipTokenSpaceGuid.PcdProductUrl|"https://wiki.radxa.com/Rock5/hardware/5a"
-  gRockchipTokenSpaceGuid.PcdDeviceTreeName|"rk3588s-rock-5a.dtb"
+  gRockchipTokenSpaceGuid.PcdDeviceTreeName|"rk3588s-rock-5a"
 
   # I2C
-  gRockchipTokenSpaceGuid.PcdI2cSlaveAddresses|{ 0x42, 0x43 }
-  gRockchipTokenSpaceGuid.PcdI2cSlaveBuses|{ 0x0, 0x0 }
-  gRockchipTokenSpaceGuid.PcdI2cSlaveBusesRuntimeSupport|{ FALSE, FALSE }
+  gRockchipTokenSpaceGuid.PcdI2cSlaveAddresses|{ 0x42, 0x43, 0x11 }
+  gRockchipTokenSpaceGuid.PcdI2cSlaveBuses|{ 0x0, 0x0, 0x7 }
+  gRockchipTokenSpaceGuid.PcdI2cSlaveBusesRuntimeSupport|{ FALSE, FALSE, FALSE }
   gRockchipTokenSpaceGuid.PcdRk860xRegulatorAddresses|{ 0x42, 0x43 }
   gRockchipTokenSpaceGuid.PcdRk860xRegulatorBuses|{ 0x0, 0x0 }
   gRockchipTokenSpaceGuid.PcdRk860xRegulatorTags|{ $(SCMI_CLK_CPUB01), $(SCMI_CLK_CPUB23) }
-
-  #
-  # CPU Performance default values
-  #
-  gRK3588TokenSpaceGuid.PcdCPULClusterClockPresetDefault|$(CPU_PERF_CLUSTER_CLOCK_PRESET_BOOTDEFAULT)
-  gRK3588TokenSpaceGuid.PcdCPUB01ClusterClockPresetDefault|$(CPU_PERF_CLUSTER_CLOCK_PRESET_BOOTDEFAULT)
-  gRK3588TokenSpaceGuid.PcdCPUB23ClusterClockPresetDefault|$(CPU_PERF_CLUSTER_CLOCK_PRESET_BOOTDEFAULT)
 
   #
   # PCIe/SATA/USB Combo PIPE PHY support flags and default values
@@ -93,9 +86,22 @@
   gRK3588TokenSpaceGuid.PcdGmac1RxDelay|0x3e
 
   #
+  # I2S
+  #
+  gRK3588TokenSpaceGuid.PcdI2S0Supported|TRUE
+
+  #
   # On-Board fan output
   #
   gRK3588TokenSpaceGuid.PcdHasOnBoardFanOutput|TRUE
+
+  #
+  # Display support flags and default values
+  #
+  gRK3588TokenSpaceGuid.PcdDisplayConnectors|{CODE({
+    VOP_OUTPUT_IF_HDMI0,
+    VOP_OUTPUT_IF_DP0
+  })}
 
 ################################################################################
 #
@@ -105,6 +111,10 @@
 [Components.common]
   # ACPI Support
   $(PLATFORM_DIRECTORY)/AcpiTables/AcpiTables.inf
+
+  # Device Tree Support
+  $(PLATFORM_DIRECTORY)/DeviceTree/Vendor.inf
+  $(PLATFORM_DIRECTORY)/DeviceTree/Mainline.inf
 
   # Splash screen logo
   $(VENDOR_DIRECTORY)/Drivers/LogoDxe/LogoDxe.inf

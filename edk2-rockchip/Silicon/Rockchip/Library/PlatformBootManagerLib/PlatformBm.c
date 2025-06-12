@@ -1,6 +1,7 @@
 /** @file
   Implementation for PlatformBootManagerLib library class interfaces.
 
+  Copyright (c) 2023-2024, Mario Bălănică <mariobalanica02@gmail.com>
   Copyright (C) 2015-2016, Red Hat, Inc.
   Copyright (c) 2014 - 2021, ARM Ltd. All rights reserved.<BR>
   Copyright (c) 2004 - 2018, Intel Corporation. All rights reserved.<BR>
@@ -20,7 +21,6 @@
 #include <Library/UefiBootManagerLib.h>
 #include <Library/UefiLib.h>
 #include <Library/UefiRuntimeServicesTableLib.h>
-#include <Library/RkAtagsLib.h>
 #include <Protocol/BootManagerPolicy.h>
 #include <Protocol/DevicePath.h>
 #include <Protocol/EsrtManagement.h>
@@ -38,6 +38,8 @@
 #include <Protocol/FirmwareVolume2.h>
 
 #include "PlatformBm.h"
+
+#define BOOT_PROMPT  L"Setup (ESC/F2)   Shell (F1)   Reset to MaskROM (F4)   Continue (Enter)"
 
 #define DP_NODE_LEN(Type)  { (UINT8)sizeof (Type), (UINT8)(sizeof (Type) >> 8) }
 
@@ -65,10 +67,10 @@ STATIC PLATFORM_SERIAL_CONSOLE  mSerialConsole = {
   {
     { MESSAGING_DEVICE_PATH, MSG_UART_DP,  DP_NODE_LEN (UART_DEVICE_PATH)   },
     0,                                      // Reserved
-    FixedPcdGet64 (PcdUartDefaultBaudRate), // BaudRate
-    FixedPcdGet8 (PcdUartDefaultDataBits),  // DataBits
-    FixedPcdGet8 (PcdUartDefaultParity),    // Parity
-    FixedPcdGet8 (PcdUartDefaultStopBits)   // StopBits
+    0,                                      // BaudRate
+    0,                                      // DataBits
+    0,                                      // Parity
+    0,                                      // StopBits
   },
 
   //
@@ -304,68 +306,6 @@ IsUsbHost (
       CompareGuid (Device->Type, &gEdkiiNonDiscoverableXhciDeviceGuid))
   {
     return TRUE;
-  }
-
-  return FALSE;
-}
-
-/**
-  This FILTER_FUNCTION checks if the Block I/O protocol handle
-  corresponds to that of the boot SD/eMMC device.
-
-  This code is almost identical to FvbCheckIsBootDevice from RkFvbDxe.
-**/
-STATIC
-BOOLEAN
-EFIAPI
-IsSdBootBlockIo (
-  IN EFI_HANDLE    Handle,
-  IN CONST CHAR16  *ReportText
-  )
-{
-  EFI_STATUS                          Status;
-  EFI_DEVICE_PATH_PROTOCOL            *DevicePath;
-  EFI_HANDLE                          DeviceHandle;
-  NON_DISCOVERABLE_DEVICE             *Device;
-  EFI_ACPI_ADDRESS_SPACE_DESCRIPTOR   *Descriptor;
-  RKATAG_BOOTDEV                      *BootDevice;
-
-  BootDevice = RkAtagsGetBootDev ();
-  if (BootDevice == NULL) {
-    return FALSE;
-  }
-
-  DevicePath = DevicePathFromHandle (Handle);
-
-  if (DevicePath->Type != HARDWARE_DEVICE_PATH
-      || DevicePath->SubType != HW_VENDOR_DP) {
-    return FALSE;
-  }
-
-  Status = gBS->LocateDevicePath (&gEdkiiNonDiscoverableDeviceProtocolGuid,
-                   &DevicePath, &DeviceHandle);
-  if (EFI_ERROR (Status)) {
-    return FALSE;
-  }
-
-  Status = gBS->HandleProtocol (DeviceHandle,
-                   &gEdkiiNonDiscoverableDeviceProtocolGuid, (VOID **) &Device);
-  if (EFI_ERROR (Status)) {
-    return FALSE;
-  }
-
-  Descriptor = &Device->Resources[0];
-
-  if (Descriptor->Desc != ACPI_ADDRESS_SPACE_DESCRIPTOR ||
-      Descriptor->ResType != ACPI_ADDRESS_SPACE_TYPE_MEM) {
-    return FALSE;
-  }
-
-  if (BootDevice->DevType == RkAtagBootDevTypeEmmc) {
-    return Descriptor->AddrRangeMin == PcdGet32 (PcdDwcSdhciBaseAddress);
-  }
-  if (BootDevice->DevType == RkAtagBootDevTypeSd0) {
-    return Descriptor->AddrRangeMin == PcdGet32 (PcdRkSdmmcBaseAddress);
   }
 
   return FALSE;
@@ -670,27 +610,30 @@ RemoveStaleFvFileOptions (
   VOID
   )
 {
-  EFI_BOOT_MANAGER_LOAD_OPTION *BootOptions;
-  UINTN                        BootOptionCount;
-  UINTN                        Index;
+  EFI_BOOT_MANAGER_LOAD_OPTION  *BootOptions;
+  UINTN                         BootOptionCount;
+  UINTN                         Index;
 
-  BootOptions = EfiBootManagerGetLoadOptions (&BootOptionCount,
-                  LoadOptionTypeBoot);
+  BootOptions = EfiBootManagerGetLoadOptions (
+                  &BootOptionCount,
+                  LoadOptionTypeBoot
+                  );
 
   for (Index = 0; Index < BootOptionCount; ++Index) {
-    EFI_DEVICE_PATH_PROTOCOL *Node1, *Node2, *SearchNode;
-    EFI_STATUS               Status;
-    EFI_HANDLE               FvHandle;
+    EFI_DEVICE_PATH_PROTOCOL  *Node1, *Node2, *SearchNode;
+    EFI_STATUS                Status;
+    EFI_HANDLE                FvHandle;
 
     //
     // If the device path starts with neither MemoryMapped(...) nor Fv(...),
     // then keep the boot option.
     //
     Node1 = BootOptions[Index].FilePath;
-    if (!(DevicePathType (Node1) == HARDWARE_DEVICE_PATH &&
-          DevicePathSubType (Node1) == HW_MEMMAP_DP) &&
-        !(DevicePathType (Node1) == MEDIA_DEVICE_PATH &&
-          DevicePathSubType (Node1) == MEDIA_PIWG_FW_VOL_DP)) {
+    if (!((DevicePathType (Node1) == HARDWARE_DEVICE_PATH) &&
+          (DevicePathSubType (Node1) == HW_MEMMAP_DP)) &&
+        !((DevicePathType (Node1) == MEDIA_DEVICE_PATH) &&
+          (DevicePathSubType (Node1) == MEDIA_PIWG_FW_VOL_DP)))
+    {
       continue;
     }
 
@@ -699,8 +642,9 @@ RemoveStaleFvFileOptions (
     // option.
     //
     Node2 = NextDevicePathNode (Node1);
-    if (DevicePathType (Node2) != MEDIA_DEVICE_PATH ||
-        DevicePathSubType (Node2) != MEDIA_PIWG_FW_FILE_DP) {
+    if ((DevicePathType (Node2) != MEDIA_DEVICE_PATH) ||
+        (DevicePathSubType (Node2) != MEDIA_PIWG_FW_FILE_DP))
+    {
       continue;
     }
 
@@ -711,23 +655,29 @@ RemoveStaleFvFileOptions (
     // boot option.
     //
     SearchNode = Node1;
-    Status = gBS->LocateDevicePath (&gEfiFirmwareVolume2ProtocolGuid,
-                    &SearchNode, &FvHandle);
+    Status     = gBS->LocateDevicePath (
+                        &gEfiFirmwareVolume2ProtocolGuid,
+                        &SearchNode,
+                        &FvHandle
+                        );
 
     if (!EFI_ERROR (Status)) {
       //
       // The firmware volume was found; now let's see if it contains the FvFile
       // identified by GUID.
       //
-      EFI_FIRMWARE_VOLUME2_PROTOCOL     *FvProtocol;
-      MEDIA_FW_VOL_FILEPATH_DEVICE_PATH *FvFileNode;
-      UINTN                             BufferSize;
-      EFI_FV_FILETYPE                   FoundType;
-      EFI_FV_FILE_ATTRIBUTES            FileAttributes;
-      UINT32                            AuthenticationStatus;
+      EFI_FIRMWARE_VOLUME2_PROTOCOL      *FvProtocol;
+      MEDIA_FW_VOL_FILEPATH_DEVICE_PATH  *FvFileNode;
+      UINTN                              BufferSize;
+      EFI_FV_FILETYPE                    FoundType;
+      EFI_FV_FILE_ATTRIBUTES             FileAttributes;
+      UINT32                             AuthenticationStatus;
 
-      Status = gBS->HandleProtocol (FvHandle, &gEfiFirmwareVolume2ProtocolGuid,
-                      (VOID **)&FvProtocol);
+      Status = gBS->HandleProtocol (
+                      FvHandle,
+                      &gEfiFirmwareVolume2ProtocolGuid,
+                      (VOID **)&FvProtocol
+                      );
       ASSERT_EFI_ERROR (Status);
 
       FvFileNode = (MEDIA_FW_VOL_FILEPATH_DEVICE_PATH *)Node2;
@@ -756,12 +706,17 @@ RemoveStaleFvFileOptions (
     // Delete the boot option.
     //
     Status = EfiBootManagerDeleteLoadOptionVariable (
-               BootOptions[Index].OptionNumber, LoadOptionTypeBoot);
+               BootOptions[Index].OptionNumber,
+               LoadOptionTypeBoot
+               );
     DEBUG_CODE (
       CHAR16 *DevicePathString;
 
-      DevicePathString = ConvertDevicePathToText(BootOptions[Index].FilePath,
-                           FALSE, FALSE);
+      DevicePathString = ConvertDevicePathToText (
+                           BootOptions[Index].FilePath,
+                           FALSE,
+                           FALSE
+                           );
       DEBUG ((
         EFI_ERROR (Status) ? DEBUG_WARN : DEBUG_VERBOSE,
         "%a: removing stale Boot#%04x %s: %r\n",
@@ -771,8 +726,9 @@ RemoveStaleFvFileOptions (
         Status
         ));
       if (DevicePathString != NULL) {
-        FreePool (DevicePathString);
-      }
+      FreePool (DevicePathString);
+    }
+
       );
   }
 
@@ -789,9 +745,13 @@ PlatformRegisterOptionsAndKeys (
   EFI_INPUT_KEY                 Enter;
   EFI_INPUT_KEY                 F2;
   EFI_INPUT_KEY                 Esc;
+  EFI_INPUT_KEY                 F1;
+  EFI_INPUT_KEY                 F4;
   EFI_BOOT_MANAGER_LOAD_OPTION  BootOption;
 
   GetPlatformOptions ();
+
+  RemoveStaleFvFileOptions ();
 
   //
   // Register ENTER as CONTINUE key
@@ -826,6 +786,20 @@ PlatformRegisterOptionsAndKeys (
              NULL
              );
   ASSERT (Status == EFI_SUCCESS || Status == EFI_ALREADY_STARTED);
+
+  //
+  // Register UEFI Shell
+  //
+  F1.ScanCode    = SCAN_F1;
+  F1.UnicodeChar = CHAR_NULL;
+  PlatformRegisterFvBootOption (&gUefiShellFileGuid, L"UEFI Shell", 0, &F1);
+
+  //
+  // Register Maskrom Reset
+  //
+  F4.ScanCode    = SCAN_F4;
+  F4.UnicodeChar = CHAR_NULL;
+  PlatformRegisterFvBootOption (&gRockchipMaskromResetFileGuid, L"Reset to MaskROM", 0, &F4);
 }
 
 //
@@ -858,6 +832,20 @@ PlatformBootManagerBeforeConsole (
   // Dispatch deferred images after EndOfDxe event.
   //
   EfiBootManagerDispatchDeferredImages ();
+
+  //
+  // Add the hardcoded short-form USB keyboard device path to ConIn.
+  // This must be done prior to connecting any USB bus controllers, because
+  // when a keyboard gets installed, ConPlatformDxe will immediately check
+  // that its device path exists in the ConIn variable before enabling input
+  // from it. Since this variable is not initially populated at first boot,
+  // we would otherwise end up with no keyboard input during BDS countdown.
+  //
+  EfiBootManagerUpdateConsoleVariable (
+    ConIn,
+    (EFI_DEVICE_PATH_PROTOCOL *)&mUsbKeyboard,
+    NULL
+    );
 
   //
   // Locate the PCI root bridges and make the PCI bus driver connect each,
@@ -894,23 +882,6 @@ PlatformBootManagerBeforeConsole (
   FilterAndProcess (&gOhciDeviceProtocolGuid, NULL, Connect);
 
   //
-  // Connect the Block I/O device produced by the SD/eMMC device that
-  // booted UEFI. We don't want BDS to ignore this device as it would
-  // prevent RkFvbDxe from detecting it and dumping the NVRAM variables
-  // in time.
-  //
-  FilterAndProcess (&gEfiBlockIoProtocolGuid, IsSdBootBlockIo, Connect);
-
-  //
-  // Add the hardcoded short-form USB keyboard device path to ConIn.
-  //
-  EfiBootManagerUpdateConsoleVariable (
-    ConIn,
-    (EFI_DEVICE_PATH_PROTOCOL *)&mUsbKeyboard,
-    NULL
-    );
-
-  //
   // Add the hardcoded serial console device path to ConIn, ConOut, ErrOut.
   //
   STATIC_ASSERT (
@@ -925,6 +896,11 @@ PlatformBootManagerBeforeConsole (
     FixedPcdGet8 (PcdUartDefaultStopBits) != 0,
     "PcdUartDefaultStopBits must be set to an actual value, not 'default'"
     );
+
+  mSerialConsole.Uart.BaudRate = PcdGet64 (PcdUartDefaultBaudRate);
+  mSerialConsole.Uart.DataBits = PcdGet8 (PcdUartDefaultDataBits);
+  mSerialConsole.Uart.Parity   = PcdGet8 (PcdUartDefaultParity);
+  mSerialConsole.Uart.StopBits = PcdGet8 (PcdUartDefaultStopBits);
 
   CopyGuid (&mSerialConsole.TermType.Guid, &gEfiTtyTermGuid);
 
@@ -1148,7 +1124,8 @@ PlatformBootManagerAfterConsole (
   UINTN                         FirmwareVerLength;
   UINTN                         PosX;
   UINTN                         PosY;
-  EFI_INPUT_KEY                 Key;
+
+  EfiEventGroupSignal (&gRockchipEventPlatformBmAfterConsoleGuid);
 
   FirmwareVerLength = StrLen (PcdGetPtr (PcdFirmwareVersionString));
 
@@ -1163,7 +1140,8 @@ PlatformBootManagerAfterConsole (
         PcdGetPtr (PcdFirmwareVersionString)
         );
     }
-    Print (L"Press ESCAPE for boot options");
+
+    Print (BOOT_PROMPT);
   } else if (FirmwareVerLength > 0) {
     Status = gBS->HandleProtocol (
                     gST->ConsoleOutHandle,
@@ -1201,15 +1179,6 @@ PlatformBootManagerAfterConsole (
   // feedback about what is going on.
   //
   HandleCapsules ();
-
-  //
-  // Register UEFI Shell
-  //
-  Key.ScanCode    = SCAN_NULL;
-  Key.UnicodeChar = L's';
-  PlatformRegisterFvBootOption (&gUefiShellFileGuid, L"UEFI Shell", 0, &Key);
-
-  RemoveStaleFvFileOptions ();
 }
 
 /**
@@ -1237,7 +1206,7 @@ PlatformBootManagerWaitCallback (
   Status = BootLogoUpdateProgress (
              White.Pixel,
              Black.Pixel,
-             L"Press ESCAPE for boot options",
+             BOOT_PROMPT,
              White.Pixel,
              (Timeout - TimeoutRemain) * 100 / Timeout,
              0
