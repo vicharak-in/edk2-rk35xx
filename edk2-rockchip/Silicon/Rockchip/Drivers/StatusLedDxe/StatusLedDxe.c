@@ -256,7 +256,7 @@ StatusLedDxeInitialize (
 
   Status = gBS->CreateEvent (
                   EVT_TIMER | EVT_NOTIFY_SIGNAL,  // Type
-                  TPL_NOTIFY,                     // NotifyTpl
+                  TPL_CALLBACK,                   // NotifyTpl
                   TimerHandler,                   // NotifyFunction
                   NULL,                           // NotifyContext
                   &mTimerEvent                    // Event
@@ -270,7 +270,7 @@ StatusLedDxeInitialize (
 
   Status = gBS->CreateEventEx (
                   EVT_NOTIFY_SIGNAL,                            // Type
-                  TPL_NOTIFY,                                   // NotifyTpl
+                  TPL_CALLBACK,                                 // NotifyTpl
                   NotifyPlatformBmAfterConsole,                 // NotifyFunction
                   NULL,                                         // NotifyContext
                   &gRockchipEventPlatformBmAfterConsoleGuid,    // EventGroup
@@ -279,7 +279,7 @@ StatusLedDxeInitialize (
 
   Status = gBS->CreateEventEx (
                   EVT_NOTIFY_SIGNAL,                // Type
-                  TPL_NOTIFY,                       // NotifyTpl
+                  TPL_CALLBACK,                     // NotifyTpl
                   NotifyExitBootServices,           // NotifyFunction
                   NULL,                             // NotifyContext
                   &gEfiEventExitBootServicesGuid,   // EventGroup
